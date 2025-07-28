@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Patient Detail - E-Hospitality</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container mt-5">
+    <h3>Patient Detail: {{ patient.username }}</h3>
+    <p><strong>Email:</strong> {{ patient.email }}</p>
+
+    <h4>Medical History</h4>
+    <ul>
+        {% for history in medical_history %}
+        <li>{{ history.details }}</li>
+        {% empty %}
+        <li>No medical history available.</li>
+        {% endfor %}
+    </ul>
+
+    <h4>Diagnosis Notes</h4>
+    <ul>
+        {% for note in diagnosis_notes %}
+        <li>{{ note.created_at|date:"Y-m-d" }}: {{ note.note }}</li>
+        {% empty %}
+        <li>No diagnosis notes available.</li>
+        {% endfor %}
+    </ul>
+    <a href="{% url 'doctors:add_diagnosis_note' patient.id %}" class="btn btn-primary mb-3">Add Diagnosis Note</a>
+
+    <h4>Treatments</h4>
+    <ul>
+        {% for treatment in treatments %}
+        <li>{{ treatment.created_at|date:"Y-m-d" }}: {{ treatment.treatment_details }}</li>
+        {% empty %}
+        <li>No treatments available.</li>
+        {% endfor %}
+    </ul>
+    <a href="{% url 'doctors:add_treatment' patient.id %}" class="btn btn-primary mb-3">Add Treatment</a>
+
+    <h4>Prescriptions</h4>
+    <ul>
+        {% for prescription in prescriptions %}
+        <li>{{ prescription.created_at|date:"Y-m-d" }}: {{ prescription.medication.name }} - {{ prescription.dosage }}</li>
+        {% empty %}
+        <li>No prescriptions available.</li>
+        {% endfor %}
+    </ul>
+    <a href="{% url 'doctors:add_prescription' patient.id %}" class="btn btn-primary mb-3">Add Prescription</a>
+
+    <a href="{% url 'doctors:patient_list' %}" class="btn btn-secondary">Back to Patient List</a>
+</div>
+</body>
+</html>
