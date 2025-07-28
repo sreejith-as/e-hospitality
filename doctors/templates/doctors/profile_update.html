@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Update Profile</h3>
+<form method="post" class="mt-3">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="first_name" class="form-label">First Name</label>
+        <input type="text" class="form-control" id="first_name" name="first_name" value="{{ doctor.first_name }}">
+    </div>
+    <div class="mb-3">
+        <label for="last_name" class="form-label">Last Name</label>
+        <input type="text" class="form-control" id="last_name" name="last_name" value="{{ doctor.last_name }}">
+    </div>
+    <div class="mb-3">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" class="form-control" id="email" name="email" value="{{ doctor.email }}">
+    </div>
+    <div class="mb-3">
+        <label for="phone_number" class="form-label">Phone Number</label>
+        <input type="text" class="form-control" id="phone_number" name="phone_number" value="{{ doctor.phone_number }}">
+    </div>
+    <div class="mb-3">
+        <label for="gender" class="form-label">Gender</label>
+        <select class="form-select" id="gender" name="gender">
+            <option value="male" {% if doctor.gender == "male" %}selected{% endif %}>Male</option>
+            <option value="female" {% if doctor.gender == "female" %}selected{% endif %}>Female</option>
+            <option value="other" {% if doctor.gender == "other" %}selected{% endif %}>Other</option>
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Update Profile</button>
+</form>
+{% endblock %}

@@ -5,12 +5,69 @@ from django.contrib import messages
 from accounts.models import CustomUser
 from patients.models import MedicalHistory
 from .models import DiagnosisNote, Treatment, Medication, Prescription
+from patients.models import Appointment
 from accounts.utils import role_required
 
 @login_required
 @role_required('doctor')
 def dashboard(request):
+    # Render dashboard with cards for navigation
     return render(request, 'doctors/dashboard.html')
+
+@login_required
+@role_required('doctor')
+def todays_appointments(request):
+    from django.utils import timezone
+    from datetime import date
+
+    doctor = request.user
+    today = date.today()
+    appointments = Appointment.objects.filter(
+        doctor=doctor,
+        schedule__date=today
+    ).order_by('schedule__start_time')
+    context = {
+        'appointments': appointments,
+    }
+    return render(request, 'doctors/todays_appointments.html', context)
+
+@login_required
+@role_required('doctor')
+def patient_list(request):
+    doctor = request.user
+    # Get patients who have consulted this doctor at least once
+    patient_ids = Appointment.objects.filter(doctor=doctor).values_list('patient_id', flat=True).distinct()
+    patients = CustomUser.objects.filter(id__in=patient_ids)
+    return render(request, 'doctors/patient_list.html', {'patients': patients})
+
+@login_required
+@role_required('doctor')
+def profile(request):
+    doctor = request.user
+    return render(request, 'doctors/profile.html', {'doctor': doctor})
+
+@login_required
+@role_required('doctor')
+def profile_update(request):
+    doctor = request.user
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        email = request.POST.get('email')
+        phone_number = request.POST.get('phone_number')
+        gender = request.POST.get('gender')
+        if first_name and last_name and email and phone_number and gender:
+            doctor.first_name = first_name
+            doctor.last_name = last_name
+            doctor.email = email
+            doctor.phone_number = phone_number
+            doctor.gender = gender
+            doctor.save()
+            messages.success(request, 'Profile updated successfully.')
+            return redirect('doctors:profile')
+        else:
+            messages.error(request, 'All fields are required.')
+    return render(request, 'doctors/profile_update.html', {'doctor': doctor})
 
 @login_required
 @role_required('doctor')
@@ -66,8 +123,9 @@ def add_treatment(request, patient_id):
 @login_required
 @role_required('doctor')
 def appointment_schedule(request):
-    # Placeholder for appointment schedule view
-    return render(request, 'doctors/appointment_schedule.html')
+    # Fetch appointments for the logged-in doctor
+    appointments = Appointment.objects.filter(doctor=request.user).order_by('time')
+    return render(request, 'doctors/appointment_schedule.html', {'appointments': appointments})
 
 @login_required
 @role_required('doctor')
