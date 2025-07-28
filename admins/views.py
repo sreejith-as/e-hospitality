@@ -6,16 +6,73 @@ from accounts.models import CustomUser
 from .models import Department, Room, Resource, DoctorAllocation
 from accounts.utils import role_required
 
+from django.utils.timezone import now
+from django.db.models import Count, Sum
+from patients.models import Appointment, Billing
+
 @login_required
 @role_required('admin')
 def dashboard(request):
-    return render(request, 'admins/dashboard.html')
+    today = now().date()
+    total_patients = CustomUser.objects.filter(role='patient').count()
+    total_doctors = CustomUser.objects.filter(role='doctor').count()
+    todays_appointments_count = Appointment.objects.filter(schedule__date=today).count()
+    total_revenue = Billing.objects.aggregate(total=Sum('amount'))['total'] or 0
+
+    todays_appointment_status = Appointment.objects.filter(schedule__date=today).values('status').annotate(count=Count('id'))
+    todays_financial_overview = Billing.objects.filter(due_date=today).values('is_paid').annotate(count=Count('id'), total_amount=Sum('amount'))
+
+    users = CustomUser.objects.filter(role__in=['doctor', 'patient', 'admin']).order_by('role', 'username')
+    todays_appointments_list = Appointment.objects.filter(schedule__date=today).select_related('patient', 'doctor', 'schedule')
+    departments = Department.objects.all()
+    billings = Billing.objects.all()
+
+    context = {
+        'total_patients': total_patients,
+        'total_doctors': total_doctors,
+        'todays_appointments': todays_appointments_count,
+        'total_revenue': total_revenue,
+        'todays_appointment_status': todays_appointment_status,
+        'todays_financial_overview': todays_financial_overview,
+        'users': users,
+        'todays_appointments_list': todays_appointments_list,
+        'departments': departments,
+        'billings': billings,
+    }
+    return render(request, 'admins/dashboard.html', context)
+
+@login_required
+@role_required('admin')
+def all_appointments(request):
+    appointments = Appointment.objects.select_related('patient', 'doctor', 'schedule').order_by('-schedule__date', '-schedule__start_time')
+    return render(request, 'admins/all_appointments.html', {'appointments': appointments})
 
 @login_required
 @role_required('admin')
 def manage_departments(request):
     departments = Department.objects.all()
     return render(request, 'admins/manage_departments.html', {'departments': departments})
+
+@login_required
+@role_required('admin')
+def create_invoice(request):
+    if request.method == 'POST':
+        patient_id = request.POST.get('patient')
+        amount = request.POST.get('amount')
+        due_date = request.POST.get('due_date')
+        if patient_id and amount and due_date:
+            from patients.models import Billing
+            patient = CustomUser.objects.filter(id=patient_id, role='patient').first()
+            if patient:
+                Billing.objects.create(patient=patient, amount=amount, due_date=due_date, is_paid=False)
+                messages.success(request, 'Invoice created successfully.')
+                return redirect('admins:dashboard')
+            else:
+                messages.error(request, 'Invalid patient selected.')
+        else:
+            messages.error(request, 'All fields are required.')
+    patients = CustomUser.objects.filter(role='patient')
+    return render(request, 'admins/create_invoice.html', {'patients': patients})
 
 @login_required
 @role_required('admin')
@@ -30,6 +87,33 @@ def add_department(request):
         else:
             messages.error(request, 'Name is required.')
     return render(request, 'admins/add_department.html')
+
+@login_required
+@role_required('admin')
+def edit_department(request, department_id):
+    department = get_object_or_404(Department, id=department_id)
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        description = request.POST.get('description')
+        if name:
+            department.name = name
+            department.description = description
+            department.save()
+            messages.success(request, 'Department updated successfully.')
+            return redirect('admins:dashboard')
+        else:
+            messages.error(request, 'Name is required.')
+    return render(request, 'admins/edit_department.html', {'department': department})
+
+@login_required
+@role_required('admin')
+def delete_department(request, department_id):
+    department = get_object_or_404(Department, id=department_id)
+    if request.method == 'POST':
+        department.delete()
+        messages.success(request, 'Department deleted successfully.')
+        return redirect('admins:dashboard')
+    return render(request, 'admins/delete_department.html', {'department': department})
 
 @login_required
 @role_required('admin')
@@ -114,16 +198,31 @@ def manage_users(request):
 def add_user(request):
     if request.method == 'POST':
         username = request.POST.get('username')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
         email = request.POST.get('email')
+        phone_number = request.POST.get('phone_number')
+        gender = request.POST.get('gender')
+        date_of_birth = request.POST.get('date_of_birth')
         role = request.POST.get('role')
         password = request.POST.get('password')
-        if username and email and role and password:
+        if username and email and role and password and first_name and last_name and phone_number and gender and date_of_birth:
             if CustomUser.objects.filter(username=username).exists():
                 messages.error(request, 'Username already exists.')
             else:
-                user = CustomUser.objects.create_user(username=username, email=email, password=password, role=role)
+                user = CustomUser.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password,
+                    role=role,
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone_number=phone_number,
+                    gender=gender,
+                    date_of_birth=date_of_birth
+                )
                 messages.success(request, f'{role.capitalize()} user created successfully.')
-                return redirect('admins:manage_users')
+                return redirect('admins:dashboard')
         else:
             messages.error(request, 'All fields are required.')
     return render(request, 'admins/add_user.html')
@@ -134,15 +233,23 @@ def edit_user(request, user_id):
     user = get_object_or_404(CustomUser, id=user_id)
     if request.method == 'POST':
         email = request.POST.get('email')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        phone_number = request.POST.get('phone_number')
+        gender = request.POST.get('gender')
         role = request.POST.get('role')
-        if email and role:
+        if email and role and first_name and last_name and phone_number and gender:
             user.email = email
+            user.first_name = first_name
+            user.last_name = last_name
+            user.phone_number = phone_number
+            user.gender = gender
             user.role = role
             user.save()
             messages.success(request, 'User updated successfully.')
             return redirect('admins:manage_users')
         else:
-            messages.error(request, 'Email and role are required.')
+            messages.error(request, 'All fields are required.')
     return render(request, 'admins/edit_user.html', {'user': user})
 
 @login_required

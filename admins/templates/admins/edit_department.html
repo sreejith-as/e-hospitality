@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h3>Edit Department: {{ department.name }}</h3>
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="name" class="form-label">Department Name</label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ department.name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3">{{ department.description }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Department</button>
+        <a href="{% url 'admins:dashboard' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}
