@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Confirm Delete Availability</h2>
+<p>Are you sure you want to delete your availability on {{ availability.get_day_of_week_display }} from {{ availability.start_time }} to {{ availability.end_time }}?</p>
+<form method="post">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-danger">Delete</button>
+  <a href="{% url 'doctors:availability_list' %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

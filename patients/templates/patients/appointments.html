@@ -1,0 +1,34 @@
+{% extends "patients/base_dashboard.html" %}
+{% block dashboard_content %}
+<h2>Appointments</h2>
+
+<div class="mb-3">
+  <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book New Appointment</a>
+</div>
+
+<h4>Upcoming Appointments</h4>
+{% if upcoming_appointments %}
+  <ul class="list-group mb-4">
+    {% for appointment in upcoming_appointments %}
+      <li class="list-group-item">
+        Dr. {{ appointment.doctor.get_full_name }} - {{ appointment.schedule.date }} at {{ appointment.schedule.start_time }}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>No upcoming appointments.</p>
+{% endif %}
+
+<h4>Past Appointments</h4>
+{% if past_appointments %}
+  <ul class="list-group">
+    {% for appointment in past_appointments %}
+      <li class="list-group-item">
+        Dr. {{ appointment.doctor.get_full_name }} - {{ appointment.schedule.date }} at {{ appointment.schedule.start_time }}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>No past appointments.</p>
+{% endif %}
+{% endblock %}

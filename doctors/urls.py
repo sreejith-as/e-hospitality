@@ -15,4 +15,7 @@ urlpatterns = [
     path('appointment-schedule/', views.appointment_schedule, name='appointment_schedule'),
     path('medications/', views.medication_list, name='medication_list'),
     path('patients/<int:patient_id>/add-prescription/', views.add_prescription, name='add_prescription'),
+
+    # Doctor schedule management
+    path('schedule/', views.doctor_schedule_manage, name='doctor_schedule_manage'),
 ]

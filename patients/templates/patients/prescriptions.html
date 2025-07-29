@@ -1,0 +1,19 @@
+{% extends "patients/base_dashboard.html" %}
+{% block dashboard_content %}
+<h2>Prescriptions</h2>
+
+{% if prescriptions %}
+  <ul class="list-group">
+    {% for prescription in prescriptions %}
+      <li class="list-group-item">
+        <strong>Medication:</strong> {{ prescription.medication.name }}<br>
+        <strong>Dosage:</strong> {{ prescription.dosage }}<br>
+        <strong>Instructions:</strong> {{ prescription.instructions|default:"None" }}<br>
+        <strong>Date:</strong> {{ prescription.created_at|date:"Y-m-d" }}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>No prescriptions found.</p>
+{% endif %}
+{% endblock %}

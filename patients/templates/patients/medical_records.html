@@ -1,0 +1,17 @@
+{% extends "patients/base_dashboard.html" %}
+{% block dashboard_content %}
+<h2>Medical Records</h2>
+
+{% if medical_history %}
+  <ul class="list-group">
+    {% for record in medical_history %}
+      <li class="list-group-item">
+        <strong>Date:</strong> {{ record.updated_at|date:"Y-m-d" }}<br>
+        <strong>Details:</strong> {{ record.details|default:"No details provided" }}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>No medical records found.</p>
+{% endif %}
+{% endblock %}

@@ -18,6 +18,7 @@ class Appointment(models.Model):
     patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='appointments', limit_choices_to={'role': 'patient'})
     doctor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='doctor_appointments', limit_choices_to={'role': 'doctor'})
     schedule = models.ForeignKey(DoctorSchedule, on_delete=models.CASCADE)
+    symptoms = models.TextField(blank=True, null=True)
     status_choices = [
         ('booked', 'Booked'),
         ('cancelled', 'Cancelled'),

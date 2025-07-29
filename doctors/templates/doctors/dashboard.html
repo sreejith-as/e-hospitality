@@ -1,35 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-4">
-  <div class="row g-4">
-    <div class="col-md-4">
-      <div class="card text-center h-100">
-        <div class="card-body d-flex flex-column justify-content-center">
-          <h5 class="card-title">Appointments</h5>
-          <p class="card-text">View your appointments for today.</p>
-          <a href="{% url 'doctors:todays_appointments' %}" class="btn btn-primary mt-auto">Go to Appointments</a>
-        </div>
-      </div>
+<div class="d-flex" role="tabpanel">
+  <nav class="flex-column nav nav-pills me-3" style="min-width: 200px;" role="tablist" aria-orientation="vertical">
+    <a class="nav-link active" id="home-tab" data-bs-toggle="pill" href="#home" role="tab" aria-controls="home" aria-selected="true">Home</a>
+    <a class="nav-link" id="patients-tab" data-bs-toggle="pill" href="#patients" role="tab" aria-controls="patients" aria-selected="false">Patients</a>
+    <a class="nav-link" id="appointments-tab" data-bs-toggle="pill" href="#appointments" role="tab" aria-controls="appointments" aria-selected="false">Appointments</a>
+    <a class="nav-link" id="profile-tab" data-bs-toggle="pill" href="#profile" role="tab" aria-controls="profile" aria-selected="false">Profile</a>
+  </nav>
+  <div class="tab-content flex-grow-1">
+    <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
+      <h3>Welcome to your Dashboard</h3>
+      <p>Use the tabs to navigate through your dashboard.</p>
     </div>
-    <div class="col-md-4">
-      <div class="card text-center h-100">
-        <div class="card-body d-flex flex-column justify-content-center">
-          <h5 class="card-title">Patients</h5>
-          <p class="card-text">View the list of patients you have consulted.</p>
-          <a href="{% url 'doctors:patient_list' %}" class="btn btn-primary mt-auto">Go to Patients</a>
-        </div>
-      </div>
+    <div class="tab-pane fade" id="patients" role="tabpanel" aria-labelledby="patients-tab">
+      {% include "doctors/patient_list.html" %}
     </div>
-    <div class="col-md-4">
-      <div class="card text-center h-100">
-        <div class="card-body d-flex flex-column justify-content-center">
-          <h5 class="card-title">Profile</h5>
-          <p class="card-text">View and update your profile information.</p>
-          <a href="{% url 'doctors:profile' %}" class="btn btn-primary mt-auto">Go to Profile</a>
-        </div>
-      </div>
+    <div class="tab-pane fade" id="appointments" role="tabpanel" aria-labelledby="appointments-tab">
+      {% include "doctors/appointment_schedule.html" %}
+    </div>
+    <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+      {% include "doctors/profile.html" %}
     </div>
   </div>
 </div>
 {% endblock %}
-</create_file>
