@@ -1,90 +1,125 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
-<div class="d-flex" role="tabpanel">
-  <nav class="flex-column nav nav-pills me-3" style="min-width: 200px;" role="tablist" aria-orientation="vertical">
-    <a class="nav-link active" id="overview-tab" data-bs-toggle="pill" href="#overview" role="tab" aria-controls="overview" aria-selected="true">Overview</a>
-    <a class="nav-link" id="users-tab" data-bs-toggle="pill" href="#users" role="tab" aria-controls="users" aria-selected="false">Users</a>
-    <a class="nav-link" id="appointments-tab" data-bs-toggle="pill" href="#appointments" role="tab" aria-controls="appointments" aria-selected="false">Appointments</a>
-    <a class="nav-link" id="departments-tab" data-bs-toggle="pill" href="#departments" role="tab" aria-controls="departments" aria-selected="false">Departments</a>
-    <a class="nav-link" id="billing-tab" data-bs-toggle="pill" href="#billing" role="tab" aria-controls="billing" aria-selected="false">Billing</a>
+<div class="d-flex" role="tabpanel" style="min-height: 80vh;">
+  <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa;" role="tablist" aria-orientation="vertical">
+    <a class="nav-link mb-2 py-2 px-3 rounded active" id="overview-tab" data-bs-toggle="pill" href="#overview" role="tab" aria-controls="overview" aria-selected="true" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-house-door-fill me-2"></i> Overview
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="users-tab" data-bs-toggle="pill" href="#users" role="tab" aria-controls="users" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-people-fill me-2"></i> Users
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="appointments-tab" data-bs-toggle="pill" href="#appointments" role="tab" aria-controls="appointments" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-calendar-check-fill me-2"></i> Appointments
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="departments-tab" data-bs-toggle="pill" href="#departments" role="tab" aria-controls="departments" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-building me-2"></i> Departments
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="billing-tab" data-bs-toggle="pill" href="#billing" role="tab" aria-controls="billing" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-wallet2 me-2"></i> Billing
+    </a>
   </nav>
   <div class="tab-content flex-grow-1">
     <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
-      <h3>Overview</h3>
-      <div class="row">
-        <div class="col-md-3">
-          <div class="card text-white bg-primary mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Total Patients</h5>
-              <p class="card-text">{{ total_patients }}</p>
-            </div>
+      <h3 class="mb-4">System Overview</h3>
+      <div class="d-flex gap-3 flex-wrap mb-4">
+        <div class="card text-white bg-primary flex-fill" style="min-width: 150px;">
+          <div class="card-body text-center">
+            <i class="bi bi-people-fill fs-1 mb-2"></i>
+            <h5 class="card-title">{{ total_patients }}</h5>
+            <p class="card-text">Total Patients</p>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card text-white bg-success mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Total Doctors</h5>
-              <p class="card-text">{{ total_doctors }}</p>
-            </div>
+        <div class="card text-white bg-success flex-fill" style="min-width: 150px;">
+          <div class="card-body text-center">
+            <i class="bi bi-person-badge fs-1 mb-2"></i>
+            <h5 class="card-title">{{ total_doctors }}</h5>
+            <p class="card-text">Total Doctors</p>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card text-white bg-info mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Today's Appointments</h5>
-              <p class="card-text">{{ todays_appointments }}</p>
-            </div>
+        <div class="card text-white bg-info flex-fill" style="min-width: 150px;">
+          <div class="card-body text-center">
+            <i class="bi bi-calendar-check fs-1 mb-2"></i>
+            <h5 class="card-title">{{ todays_appointments }}</h5>
+            <p class="card-text">Total Appointments</p>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card text-white bg-warning mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Total Revenue</h5>
-              <p class="card-text">${{ total_revenue }}</p>
-            </div>
+        <div class="card text-white bg-warning flex-fill" style="min-width: 150px;">
+          <div class="card-body text-center">
+            <i class="bi bi-currency-dollar fs-1 mb-2"></i>
+            <h5 class="card-title">${{ total_revenue }}</h5>
+            <p class="card-text">Total Revenue</p>
           </div>
         </div>
       </div>
-      <h4>Today's Appointment Status</h4>
-      <ul>
-        {% for status in todays_appointment_status %}
-          <li>{{ status.status }}: {{ status.count }}</li>
-        {% empty %}
-          <li>No appointments today.</li>
-        {% endfor %}
-      </ul>
-      <h4>Today's Financial Overview</h4>
-      <ul>
-        {% for finance in todays_financial_overview %}
-          <li>{% if finance.is_paid %}Paid{% else %}Unpaid{% endif %}: {{ finance.count }} (Total: ${{ finance.total_amount }})</li>
-        {% empty %}
-          <li>No billing today.</li>
-        {% endfor %}
-      </ul>
+      <div class="row gap-3">
+        <div class="col-md-5 p-3 border rounded bg-white">
+          <h5>Appointment Status</h5>
+          <ul class="list-unstyled">
+            {% for status in todays_appointment_status %}
+              <li>
+                <span class="badge rounded-pill 
+                  {% if status.status == 'scheduled' %}bg-primary
+                  {% elif status.status == 'completed' %}bg-success
+                  {% elif status.status == 'cancelled' %}bg-danger
+                  {% else %}bg-secondary{% endif %} me-2">&nbsp;</span>
+                {{ status.status|capfirst }}: {{ status.count }}
+              </li>
+            {% empty %}
+              <li>No appointments today.</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="col-md-5 p-3 border rounded bg-white">
+          <h5>Financial Overview</h5>
+          <ul class="list-unstyled">
+            {% for finance in todays_financial_overview %}
+              <li>
+                {% if finance.is_paid %}
+                  <span class="text-success fw-bold">Paid</span>
+                {% else %}
+                  <span class="text-warning fw-bold">Unpaid</span>
+                {% endif %}
+                : {{ finance.count }} (Total: ${{ finance.total_amount }})
+              </li>
+            {% empty %}
+              <li>No billing today.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
     </div>
     <div class="tab-pane fade" id="users" role="tabpanel" aria-labelledby="users-tab">
-      <h3>Users</h3>
-      <a href="{% url 'admins:add_user' %}" class="btn btn-primary mb-3">Add User</a>
-      <table class="table table-striped">
+      <h3 class="mb-4">User Management</h3>
+      <a href="{% url 'admins:add_user' %}" class="btn btn-primary mb-3">+ Add User</a>
+      <table class="table table-striped align-middle">
         <thead>
           <tr>
-            <th>Username</th>
+            <th>Name</th>
             <th>Email</th>
             <th>Role</th>
-            <th>Date Joined</th>
+            <th>Created</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for user in users %}
           <tr>
-            <td>{{ user.username }}</td>
+            <td>{{ user.get_full_name }}</td>
             <td>{{ user.email }}</td>
-            <td>{{ user.role }}</td>
+            <td>
+              <span class="badge rounded-pill 
+                {% if user.role == 'admin' %}bg-warning text-dark
+                {% elif user.role == 'doctor' %}bg-success
+                {% elif user.role == 'patient' %}bg-info
+                {% else %}bg-secondary{% endif %}">
+                {{ user.role }}
+              </span>
+            </td>
             <td>{{ user.date_joined|date:"Y-m-d" }}</td>
             <td>
-              <a href="{% url 'admins:edit_user' user.id %}" class="btn btn-sm btn-warning">Edit</a>
-              <a href="{% url 'admins:delete_user' user.id %}" class="btn btn-sm btn-danger">Delete</a>
+              <a href="{% url 'admins:edit_user' user.id %}" class="btn btn-sm btn-outline-primary me-1">Edit</a>
+              <a href="{% url 'admins:delete_user' user.id %}" class="btn btn-sm btn-outline-danger">Delete</a>
             </td>
           </tr>
           {% empty %}
@@ -94,9 +129,8 @@
       </table>
     </div>
     <div class="tab-pane fade" id="appointments" role="tabpanel" aria-labelledby="appointments-tab">
-      <h3>Appointments</h3>
-      <a href="{% url 'admins:all_appointments' %}" class="btn btn-primary mb-3">View All Appointments</a>
-      <table class="table table-striped">
+      <h3 class="mb-4">All Appointments</h3>
+      <table class="table table-striped align-middle">
         <thead>
           <tr>
             <th>Patient</th>
@@ -110,13 +144,21 @@
         <tbody>
           {% for appointment in todays_appointments_list %}
           <tr>
-            <td>{{ appointment.patient.username }}</td>
-            <td>{{ appointment.doctor.username }}</td>
+            <td>{{ appointment.patient.get_full_name }}</td>
+            <td>{{ appointment.doctor.get_full_name }}</td>
             <td>{{ appointment.schedule.date }}</td>
-            <td>{{ appointment.schedule.start_time }}</td>
-            <td>{{ appointment.status }}</td>
+            <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
             <td>
-              <a href="{% url 'admins:appointment_detail' appointment.id %}" class="btn btn-sm btn-info">Details</a>
+              <span class="badge rounded-pill 
+                {% if appointment.status == 'scheduled' %}bg-primary
+                {% elif appointment.status == 'completed' %}bg-success
+                {% elif appointment.status == 'cancelled' %}bg-danger
+                {% else %}bg-secondary{% endif %}">
+                {{ appointment.status }}
+              </span>
+            </td>
+            <td>
+              <a href="{% url 'admins:appointment_detail' appointment.id %}" class="btn btn-sm btn-outline-info">View Details</a>
             </td>
           </tr>
           {% empty %}
@@ -126,61 +168,27 @@
       </table>
     </div>
     <div class="tab-pane fade" id="departments" role="tabpanel" aria-labelledby="departments-tab">
-      <h3>Departments</h3>
-      <a href="{% url 'admins:add_department' %}" class="btn btn-primary mb-3">Add Department</a>
-      <table class="table table-striped">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for department in departments %}
-          <tr>
-            <td>{{ department.name }}</td>
-            <td>{{ department.description }}</td>
-            <td>
-              <a href="{% url 'admins:edit_department' department.id %}" class="btn btn-sm btn-warning">Edit</a>
-              <a href="{% url 'admins:delete_department' department.id %}" class="btn btn-sm btn-danger">Delete</a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="3">No departments found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <h3 class="mb-4">Department Management</h3>
+      <a href="{% url 'admins:add_department' %}" class="btn btn-primary mb-3">+ Add Department</a>
+      <div class="d-flex flex-wrap gap-3">
+        {% for department in departments %}
+        <div class="card p-3 flex-fill" style="min-width: 250px; max-width: 350px;">
+          <h5>{{ department.name }}</h5>
+          <p class="text-muted">{{ department.description }}</p>
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'admins:edit_department' department.id %}" class="btn btn-outline-primary btn-sm">Edit</a>
+            <a href="{% url 'admins:delete_department' department.id %}" class="btn btn-outline-danger btn-sm">Delete</a>
+          </div>
+        </div>
+        {% empty %}
+        <p>No departments found.</p>
+        {% endfor %}
+      </div>
     </div>
     <div class="tab-pane fade" id="billing" role="tabpanel" aria-labelledby="billing-tab">
-      <h3>Billing</h3>
-      <a href="{% url 'admins:create_invoice' %}" class="btn btn-primary mb-3">Create Invoice</a>
-      <table class="table table-striped">
-        <thead>
-          <tr>
-            <th>Patient</th>
-            <th>Amount</th>
-            <th>Due Date</th>
-            <th>Paid</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for bill in billings %}
-          <tr>
-            <td>{{ bill.patient.username }}</td>
-            <td>${{ bill.amount }}</td>
-            <td>{{ bill.due_date }}</td>
-            <td>{% if bill.is_paid %}Yes{% else %}No{% endif %}</td>
-            <td>
-              <a href="{% url 'admins:view_billing' bill.id %}" class="btn btn-sm btn-info">View</a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5">No billing records found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <h3 class="mb-4">Billing Management</h3>
+      <a href="{% url 'admins:create_invoice' %}" class="btn btn-primary mb-3">+ Create Invoice</a>
+      <p>Billing management features will be displayed here.</p>
     </div>
   </div>
 </div>
