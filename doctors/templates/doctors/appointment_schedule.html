@@ -1,10 +1,15 @@
-<h3>Appointment Schedule</h3>
+<h3>My Appointments
+  <span class="badge bg-primary ms-2">{{ scheduled_count }} Scheduled</span>
+  <span class="badge bg-success ms-2">{{ completed_today_count }} Completed Today</span>
+</h3>
 {% if appointments %}
-<table class="table table-striped">
+<table class="table table-striped table-hover align-middle">
     <thead>
         <tr>
-            <th>Patient Name</th>
+            <th>Patient</th>
+            <th>Date</th>
             <th>Time</th>
+            <th>Reason</th>
             <th>Status</th>
             <th>Actions</th>
         </tr>
@@ -13,11 +18,23 @@
     {% for appointment in appointments %}
         <tr>
             <td>{{ appointment.patient.get_full_name }}</td>
-            <td>{{ appointment.time }}</td>
-            <td>{{ appointment.status }}</td>
+            <td>{{ appointment.schedule.date }}</td>
+            <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
+            <td>{{ appointment.symptoms }}</td>
             <td>
-                <a href="#" class="btn btn-success btn-sm">Mark Completed</a>
-                <a href="{% url 'doctors:add_prescription' appointment.patient.id %}" class="btn btn-primary btn-sm">Prescribe</a>
+                {% if appointment.status == 'booked' %}
+                    <span class="badge bg-primary text-uppercase">scheduled</span>
+                {% elif appointment.status == 'completed' %}
+                    <span class="badge bg-success text-uppercase">completed</span>
+                {% else %}
+                    <span class="badge bg-secondary text-uppercase">{{ appointment.status }}</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if appointment.status == 'booked' %}
+                    <a href="#" class="btn btn-success btn-sm me-1">Complete</a>
+                {% endif %}
+                <a href="{% url 'doctors:add_prescription' appointment.patient.id %}" class="btn btn-outline-primary btn-sm">Prescribe</a>
             </td>
         </tr>
     {% endfor %}

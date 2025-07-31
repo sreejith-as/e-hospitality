@@ -12,8 +12,18 @@ from .forms import DoctorScheduleForm
 @login_required
 @role_required('doctor')
 def dashboard(request):
-    # Render dashboard with cards for navigation
-    return render(request, 'doctors/dashboard.html')
+    from django.utils import timezone
+    today = timezone.now().date()
+    doctor = request.user
+    appointments = Appointment.objects.filter(doctor=doctor).order_by('schedule__date', 'schedule__start_time')
+    scheduled_count = appointments.filter(status='booked').count()
+    completed_today_count = appointments.filter(status='completed', schedule__date=today).count()
+    context = {
+        'appointments': appointments,
+        'scheduled_count': scheduled_count,
+        'completed_today_count': completed_today_count,
+    }
+    return render(request, 'doctors/dashboard.html', context)
 
 @login_required
 @role_required('doctor')
