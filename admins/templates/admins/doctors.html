@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Doctors</h2>
+<a href="{% url 'admins:add_doctor' %}" class="btn btn-primary mb-3">Add New Doctor</a>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Username</th>
+      <th>Email</th>
+      <th>Phone Number</th>
+      <th>Gender</th>
+      <th>Department</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for user in users %}
+    <tr>
+      <td>{{ user.username }}</td>
+      <td>{{ user.email }}</td>
+      <td>{{ user.phone_number }}</td>
+      <td>{{ user.get_gender_display }}</td>
+      <td>
+        {% with allocation=user.doctorallocation_set.first %}
+          {% if allocation %}
+            {{ allocation.department.name }}
+          {% else %}
+            N/A
+          {% endif %}
+        {% endwith %}
+      </td>
+      <td>
+        <a href="{% url 'admins:edit_doctor' user.id %}" class="btn btn-sm btn-warning">Edit</a>
+        <a href="{% url 'admins:delete_doctor' user.id %}" class="btn btn-sm btn-danger">Delete</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="6">No doctors found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

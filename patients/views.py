@@ -11,6 +11,7 @@ from accounts.utils import role_required
 from django.utils import timezone
 from datetime import timedelta
 from .forms import AppointmentBookingForm
+from django.http import JsonResponse
 
 @login_required
 @role_required('patient')
@@ -31,6 +32,43 @@ def overview(request):
         'recent_activity': recent_activity,
     }
     return render(request, 'patients/dashboard.html', context)
+
+@login_required
+@role_required('patient')
+def get_doctors_by_department(request):
+    department_id = request.GET.get('department_id')
+    doctors = CustomUser.objects.filter(role='doctor', doctorallocation__department_id=department_id).distinct()
+    doctor_list = [{'id': doc.id, 'username': doc.get_full_name()} for doc in doctors]
+    return JsonResponse({'doctors': doctor_list})
+
+@login_required
+@role_required('patient')
+def get_available_time_slots(request):
+    doctor_id = request.GET.get('doctor_id')
+    date = request.GET.get('date')
+    if not doctor_id or not date:
+        return JsonResponse({'error': 'Missing parameters'}, status=400)
+    # Fetch DoctorAvailability for the day of week
+    from datetime import datetime
+    day_of_week = datetime.strptime(date, '%Y-%m-%d').strftime('%a').lower()[:3]
+    availabilities = DoctorAvailability.objects.filter(doctor_id=doctor_id, day_of_week=day_of_week)
+    # Fetch already booked time slots for the doctor on the date
+    booked_slots = Appointment.objects.filter(doctor_id=doctor_id, schedule__date=date, status='booked').values_list('schedule__start_time', flat=True)
+    # Calculate available slots by excluding booked slots
+    available_slots = []
+    for availability in availabilities:
+        start = availability.start_time
+        end = availability.end_time
+        # Assuming 30-minute slots
+        from datetime import datetime, timedelta, time
+        current_time = datetime.combine(datetime.strptime(date, '%Y-%m-%d'), start)
+        end_time = datetime.combine(datetime.strptime(date, '%Y-%m-%d'), end)
+        while current_time + timedelta(minutes=30) <= end_time:
+            slot_time = current_time.time()
+            if slot_time not in booked_slots:
+                available_slots.append(slot_time.strftime('%H:%M'))
+            current_time += timedelta(minutes=30)
+    return JsonResponse({'available_slots': available_slots})
 
 @login_required
 @role_required('patient')

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
-<div class="d-flex" role="tabpanel" style="min-height: 80vh;">
-  <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa;" role="tablist" aria-orientation="vertical">
+<div class="d-flex" role="tabpanel" style="min-height: 100vh;">
+  <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa; max-height: calc(100vh - 100px); overflow-y: auto;" role="tablist" aria-orientation="vertical">
     <a class="nav-link mb-2 py-2 px-3 rounded active" id="overview-tab" data-bs-toggle="pill" href="#overview" role="tab" aria-controls="overview" aria-selected="true" style="font-weight: 600; font-size: 1.1rem;">
       <i class="bi bi-house-door-fill me-2"></i> Overview
     </a>
@@ -91,42 +91,41 @@
     </div>
     <div class="tab-pane fade" id="users" role="tabpanel" aria-labelledby="users-tab">
       <h3 class="mb-4">User Management</h3>
-      <a href="{% url 'admins:add_user' %}" class="btn btn-primary mb-3">+ Add User</a>
-      <table class="table table-striped align-middle">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for user in users %}
-          <tr>
-            <td>{{ user.get_full_name }}</td>
-            <td>{{ user.email }}</td>
-            <td>
-              <span class="badge rounded-pill 
-                {% if user.role == 'admin' %}bg-warning text-dark
-                {% elif user.role == 'doctor' %}bg-success
-                {% elif user.role == 'patient' %}bg-info
-                {% else %}bg-secondary{% endif %}">
-                {{ user.role }}
-              </span>
-            </td>
-            <td>{{ user.date_joined|date:"Y-m-d" }}</td>
-            <td>
-              <a href="{% url 'admins:edit_user' user.id %}" class="btn btn-sm btn-outline-primary me-1">Edit</a>
-              <a href="{% url 'admins:delete_user' user.id %}" class="btn btn-sm btn-outline-danger">Delete</a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5">No users found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div class="row mt-4">
+        <div class="col-md-4">
+          <a href="{% url 'admins:list_patients' %}" class="text-decoration-none">
+            <div class="card text-white bg-primary mb-3">
+              <div class="card-body">
+                <h5 class="card-title">Patients</h5>
+                <p class="card-text">Total Patients: {{ total_patients }}</p>
+                <button class="btn btn-light">Manage Patients</button>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div class="col-md-4">
+          <a href="{% url 'admins:list_doctors' %}" class="text-decoration-none">
+            <div class="card text-white bg-success mb-3">
+              <div class="card-body">
+                <h5 class="card-title">Doctors</h5>
+                <p class="card-text">Total Doctors: {{ total_doctors }}</p>
+                <button class="btn btn-light">Manage Doctors</button>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div class="col-md-4">
+          <a href="{% url 'admins:list_admins' %}" class="text-decoration-none">
+            <div class="card text-white bg-warning mb-3">
+              <div class="card-body">
+                <h5 class="card-title">Admins</h5>
+                <p class="card-text">Total Admins: {{ total_admins }}</p>
+                <button class="btn btn-light">Manage Admins</button>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
     </div>
     <div class="tab-pane fade" id="appointments" role="tabpanel" aria-labelledby="appointments-tab">
       <h3 class="mb-4">All Appointments</h3>
@@ -192,4 +191,28 @@
     </div>
   </div>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Get the hash from URL (e.g., #users)
+    const hash = window.location.hash;
+
+    // If there's a valid tab ID in the hash
+    if (hash) {
+      const tabTrigger = document.querySelector(`a[data-bs-toggle="pill"][href="${hash}"]`);
+      if (tabTrigger) {
+        // Activate the tab
+        new bootstrap.Tab(tabTrigger).show();
+      }
+    }
+
+    // Optional: Update URL hash when a tab is clicked
+    const tabButtons = document.querySelectorAll('a[data-bs-toggle="pill"]');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', function () {
+        history.pushState(null, null, this.getAttribute('href'));
+      });
+    });
+  });
+</script>
 {% endblock %}

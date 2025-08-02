@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="d-flex" role="tabpanel" style="min-height: 100vh;">
+  <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa; max-height: calc(100vh - 100px); overflow-y: auto;" role="tablist" aria-orientation="vertical">
+    <a class="nav-link mb-2 py-2 px-3 rounded active" id="appointments-tab" data-bs-toggle="pill" href="#appointments" role="tab" aria-controls="appointments" aria-selected="true" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-calendar-check-fill me-2"></i> Appointments
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="patients-tab" data-bs-toggle="pill" href="#patients" role="tab" aria-controls="patients" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-people-fill me-2"></i> Patients
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="profile-tab" data-bs-toggle="pill" href="#profile" role="tab" aria-controls="profile" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-person-circle me-2"></i> Profile
+    </a>
+  </nav>
+  <div class="tab-content flex-grow-1">
+    <div class="tab-pane fade show active" id="appointments" role="tabpanel" aria-labelledby="appointments-tab">
+      <h3 class="mb-4">My Appointments</h3>
+      <span class="badge bg-primary me-2">1 Scheduled</span>
+      <span class="badge bg-success">1 Completed Today</span>
+      <table class="table table-striped align-middle mt-3">
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for appointment in appointments %}
+          <tr>
+            <td>{{ appointment.patient.get_full_name }}</td>
+            <td>{{ appointment.schedule.date }}</td>
+            <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
+            <td>{{ appointment.symptoms|default:"N/A" }}</td>
+            <td>
+              {% if appointment.status == 'booked' %}
+                <span class="badge bg-primary">Scheduled</span>
+              {% elif appointment.status == 'completed' %}
+                <span class="badge bg-success">Completed</span>
+              {% elif appointment.status == 'cancelled' %}
+                <span class="badge bg-danger">Cancelled</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ appointment.status }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <button class="btn btn-success btn-sm me-1">Complete</button>
+              <button class="btn btn-outline-primary btn-sm">Prescribe</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6">No appointments found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="tab-pane fade" id="patients" role="tabpanel" aria-labelledby="patients-tab">
+      <h3 class="mb-4">My Patients</h3>
+      <div class="row row-cols-1 row-cols-md-2 g-3">
+        {% for patient in patients %}
+        <div class="col">
+          <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <h5>{{ patient.get_full_name }}</h5>
+                <p class="mb-1 text-muted">{{ patient.email }}</p>
+                <p class="mb-1 text-muted">{{ patient.phone_number }}</p>
+                <p class="mb-0 text-muted">Last Visit: N/A</p>
+              </div>
+              <div>
+                <i class="bi bi-person-circle fs-1 text-primary"></i>
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary flex-fill"><i class="bi bi-capsule me-1"></i> Prescribe</button>
+              <button class="btn btn-outline-secondary flex-fill"><i class="bi bi-file-earmark-text me-1"></i> Add Record</button>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <p>No patients found.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+      <h3 class="mb-4">Doctor Profile</h3>
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <i class="bi bi-person-circle fs-1 text-primary"></i>
+          <h4 class="mt-2">{{ doctor.get_full_name }}</h4>
+          <p class="text-muted">Specialty: {% if doctor_allocation %}{{ doctor_allocation.department.name }}{% else %}N/A{% endif %}</p>
+        </div>
+        <div class="col-md-8">
+          <dl class="row">
+            <dt class="col-sm-4">Full Name</dt>
+            <dd class="col-sm-8">{{ doctor.get_full_name }}</dd>
+
+            <dt class="col-sm-4">Email</dt>
+            <dd class="col-sm-8">{{ doctor.email }}</dd>
+
+            <dt class="col-sm-4">Phone Number</dt>
+            <dd class="col-sm-8">{{ doctor.phone_number }}</dd>
+
+            <dt class="col-sm-4">Gender</dt>
+            <dd class="col-sm-8">{{ doctor.get_gender_display }}</dd>
+
+            <dt class="col-sm-4">Working Days</dt>
+            <dd class="col-sm-8">
+              {% if schedule %}
+                {% if schedule.work_monday %}Mon {% endif %}
+                {% if schedule.work_tuesday %}Tue {% endif %}
+                {% if schedule.work_wednesday %}Wed {% endif %}
+                {% if schedule.work_thursday %}Thu {% endif %}
+                {% if schedule.work_friday %}Fri {% endif %}
+                {% if schedule.work_saturday %}Sat {% endif %}
+                {% if schedule.work_sunday %}Sun {% endif %}
+              {% else %}
+                Not set
+              {% endif %}
+            </dd>
+
+            <dt class="col-sm-4">Working Hours</dt>
+            <dd class="col-sm-8">
+              {% if schedule %}
+                {{ schedule.start_time|time:"H:i" }} - {{ schedule.end_time|time:"H:i" }}
+              {% else %}
+                Not set
+              {% endif %}
+            </dd>
+          </dl>
+          <a href="{% url 'doctors:profile_update' %}" class="btn btn-primary">Update Profile</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const hash = window.location.hash;
+
+    const tabMapping = {
+      '#appointments': '#appointments-tab',
+      '#patients': '#patients-tab',
+      '#profile': '#profile-tab'
+    };
+
+    if (hash && tabMapping[hash]) {
+      const tabButton = document.querySelector(tabMapping[hash]);
+      if (tabButton) {
+        new bootstrap.Tab(tabButton).show();
+      }
+    }
+  });
+</script>
+{% endblock %}

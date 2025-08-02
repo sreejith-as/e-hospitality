@@ -44,7 +44,7 @@
             </select>
         </div>
         <button type="submit" class="btn btn-primary">Update User</button>
-        <a href="{% url 'admins:manage_users' %}" class="btn btn-secondary">Cancel</a>
+        <a href="{% url 'admins:manage_users_by_role' role=user.role %}" class="btn btn-secondary">Cancel</a>
     </form>
 </div>
 </body>

@@ -1,88 +1,215 @@
 {% extends "base.html" %}
 {% load static %}
+
 {% block content %}
-<div class="d-flex">
-  <nav id="sidebar" class="bg-light border-end" style="width: 250px; min-height: 100vh;">
-    <div class="sidebar-header p-3">
-      <h4>E-Hospitality</h4>
-      <p class="text-muted">Patient Dashboard</p>
-    </div>
-    <ul class="nav flex-column">
-      <li class="nav-item">
-        <a class="nav-link {% if request.resolver_match.url_name == 'overview' %}active{% endif %}" href="{% url 'patients:overview' %}">Overview</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.resolver_match.url_name == 'appointments' %}active{% endif %}" href="{% url 'patients:appointments' %}">Appointments</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.resolver_match.url_name == 'medical_records' %}active{% endif %}" href="{% url 'patients:medical_records' %}">Medical Records</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.resolver_match.url_name == 'prescriptions' %}active{% endif %}" href="{% url 'patients:prescriptions' %}">Prescriptions</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.resolver_match.url_name == 'billing' %}active{% endif %}" href="{% url 'patients:billing' %}">Billing</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if request.resolver_match.url_name == 'health_education' %}active{% endif %}" href="{% url 'patients:health_education' %}">Education</a>
-      </li>
-      <li class="nav-item mt-3">
-        <a class="nav-link text-danger" href="{% url 'accounts:logout' %}">Logout</a>
-      </li>
-    </ul>
+<div class="d-flex" role="tabpanel" style="min-height: 100vh;">
+  <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa; max-height: calc(100vh - 100px); overflow-y: auto;" role="tablist" aria-orientation="vertical">
+    <a class="nav-link mb-2 py-2 px-3 rounded active" id="overview-tab" data-bs-toggle="pill" href="#overview" role="tab" aria-controls="overview" aria-selected="true" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-house-fill me-2"></i> Overview
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="appointments-tab" data-bs-toggle="pill" href="#appointments" role="tab" aria-controls="appointments" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-calendar-check-fill me-2"></i> Appointments
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="medical-records-tab" data-bs-toggle="pill" href="#medical-records" role="tab" aria-controls="medical-records" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-file-earmark-text-fill me-2"></i> Medical Records
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="prescriptions-tab" data-bs-toggle="pill" href="#prescriptions" role="tab" aria-controls="prescriptions" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-capsule-pill me-2"></i> Prescriptions
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="billing-tab" data-bs-toggle="pill" href="#billing" role="tab" aria-controls="billing" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-credit-card-2-front-fill me-2"></i> Billing
+    </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="education-tab" data-bs-toggle="pill" href="#education" role="tab" aria-controls="education" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-book-fill me-2"></i> Education
+    </a>
   </nav>
-  <main class="flex-grow-1 p-4">
-    {% block dashboard_content %}
-    <h3>Welcome, {{ request.user.first_name }}!</h3>
-    <p class="lead">This is your patient dashboard.</p>
-
-    {% if upcoming_appointments %}
-    <div class="alert alert-info" role="alert">
-      You have {{ upcoming_appointments|length }} upcoming appointment{{ upcoming_appointments|length|pluralize }}.
-    </div>
-    {% endif %}
-
-    {% if unpaid_bills %}
-    <div class="alert alert-warning" role="alert">
-      You have {{ unpaid_bills|length }} unpaid bill{{ unpaid_bills|length|pluralize }}. Please make payment.
-    </div>
-    {% endif %}
-
-    <div class="row g-4 mt-3">
-      <div class="col-md-3">
-        <div class="card text-center h-100">
-          <div class="card-body d-flex flex-column justify-content-center">
-            <h5 class="card-title">Upcoming Appointments</h5>
-            <p class="card-text">You have {{ upcoming_appointments|length }} upcoming appointment{{ upcoming_appointments|length|pluralize }}.</p>
+  <div class="tab-content flex-grow-1 p-3 border rounded bg-white">
+    <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+      <div class="row g-3 mb-4">
+        <div class="col">
+          <div class="card text-center p-3 shadow-sm">
+            <i class="bi bi-calendar-check-fill fs-1 text-primary"></i>
+            <h2>{{ upcoming_appointments|length }}</h2>
+            <p>Upcoming Appointments</p>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card text-center p-3 shadow-sm">
+            <i class="bi bi-file-earmark-text-fill fs-1 text-success"></i>
+            <h2>{{ medical_records_count }}</h2>
+            <p>Medical Records</p>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card text-center p-3 shadow-sm">
+            <i class="bi bi-capsule-pill fs-1 text-info"></i>
+            <h2>{{ active_prescriptions|length }}</h2>
+            <p>Active Prescriptions</p>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card text-center p-3 shadow-sm">
+            <i class="bi bi-credit-card-2-front-fill fs-1 text-warning"></i>
+            <h2>{{ unpaid_bills|length }}</h2>
+            <p>Unpaid Bills</p>
           </div>
         </div>
       </div>
-      <div class="col-md-3">
-        <div class="card text-center h-100">
-          <div class="card-body d-flex flex-column justify-content-center">
-            <h5 class="card-title">Medical Records</h5>
-            <p class="card-text">View your medical history and records.</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card text-center h-100">
-          <div class="card-body d-flex flex-column justify-content-center">
-            <h5 class="card-title">Active Prescriptions</h5>
-            <p class="card-text">You have {{ active_prescriptions|length }} active prescription{{ active_prescriptions|length|pluralize }}.</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card text-center h-100">
-          <div class="card-body d-flex flex-column justify-content-center">
-            <h5 class="card-title">Outstanding Bills</h5>
-            <p class="card-text">You have {{ unpaid_bills|length }} unpaid bill{{ unpaid_bills|length|pluralize }}.</p>
-          </div>
-        </div>
+      <div class="card p-3">
+        <h4>Recent Activity</h4>
+        {% if recent_activity %}
+          <ul>
+            {% for activity in recent_activity %}
+              <li>{{ activity }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>No recent activity to display.</p>
+        {% endif %}
       </div>
     </div>
-    {% endblock %}
-  </main>
+    <div class="tab-pane fade" id="appointments" role="tabpanel" aria-labelledby="appointments-tab">
+      <h3>Appointments</h3>
+      <p><a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book an Appointment</a></p>
+      <table class="table table-striped mt-3">
+        <thead>
+          <tr>
+            <th>Doctor</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Reason</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for appointment in upcoming_appointments %}
+          <tr>
+            <td>{{ appointment.doctor.get_full_name }}</td>
+            <td>{{ appointment.schedule.date }}</td>
+            <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
+            <td>{{ appointment.symptoms|default:"N/A" }}</td>
+            <td>
+              {% if appointment.status == 'booked' %}
+                <span class="badge bg-primary">Scheduled</span>
+              {% elif appointment.status == 'completed' %}
+                <span class="badge bg-success">Completed</span>
+              {% elif appointment.status == 'cancelled' %}
+                <span class="badge bg-danger">Cancelled</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ appointment.status }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5">No upcoming appointments found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="tab-pane fade" id="medical-records" role="tabpanel" aria-labelledby="medical-records-tab">
+      <h3>Medical Records</h3>
+      {% if medical_history %}
+      <table class="table table-striped mt-3">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Doctor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in medical_history %}
+          <tr>
+            <td>{{ record.updated_at|date:"Y-m-d" }}</td>
+            <td>{{ record.description }}</td>
+            <td>{{ record.doctor.get_full_name }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No medical records found.</p>
+      {% endif %}
+    </div>
+    <div class="tab-pane fade" id="prescriptions" role="tabpanel" aria-labelledby="prescriptions-tab">
+      <h3>Prescriptions</h3>
+      {% if prescriptions %}
+      <table class="table table-striped mt-3">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Medication</th>
+            <th>Dosage</th>
+            <th>Instructions</th>
+            <th>Prescribed By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for prescription in prescriptions %}
+          <tr>
+            <td>{{ prescription.created_at|date:"Y-m-d" }}</td>
+            <td>{{ prescription.medication.name }}</td>
+            <td>{{ prescription.dosage }}</td>
+            <td>{{ prescription.instructions }}</td>
+            <td>{{ prescription.doctor.get_full_name }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No prescriptions found.</p>
+      {% endif %}
+    </div>
+    <div class="tab-pane fade" id="billing" role="tabpanel" aria-labelledby="billing-tab">
+      <h3>Billing & Invoices</h3>
+      {% if unpaid_bills %}
+      <table class="table table-striped mt-3">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for bill in unpaid_bills %}
+          <tr>
+            <td>{{ bill.service_name }}</td>
+            <td>{{ bill.due_date|date:"Y-m-d" }}</td>
+            <td>{{ bill.amount }}</td>
+            <td>{% if bill.is_paid %}Paid{% else %}Unpaid{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No billing records found.</p>
+      {% endif %}
+    </div>
+    <div class="tab-pane fade" id="education" role="tabpanel" aria-labelledby="education-tab">
+      <h3>Health Education</h3>
+      <div class="row row-cols-1 row-cols-md-3 g-3 mt-3">
+        <div class="col">
+          <div class="card p-3 shadow-sm">
+            <h5>Healthy Eating</h5>
+            <p>Learn about balanced diets and nutrition.</p>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card p-3 shadow-sm">
+            <h5>Exercise Tips</h5>
+            <p>Guidance on staying active and fit.</p>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card p-3 shadow-sm">
+            <h5>Mental Health</h5>
+            <p>Resources for mental well-being.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
