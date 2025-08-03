@@ -78,7 +78,34 @@ def list_patients(request):
 @login_required
 @role_required('admin')
 def list_doctors(request):
-    doctors = CustomUser.objects.filter(role='doctor').order_by('username')
+    from doctors.models import DoctorAvailability
+    doctors = list(CustomUser.objects.filter(role='doctor').order_by('username'))
+    availabilities = DoctorAvailability.objects.filter(doctor__in=doctors)
+    availability_map = {}
+    for availability in availabilities:
+        availability_map.setdefault(availability.doctor_id, []).append(availability)
+    # Attach availabilities to each doctor object
+    for doctor in doctors:
+        doctor.availability_list = availability_map.get(doctor.id, [])
+        # Create working days string in correct order (Mon to Sun)
+        days_order = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        days_map = {
+            'mon': 'Mon',
+            'tue': 'Tue',
+            'wed': 'Wed',
+            'thu': 'Thu',
+            'fri': 'Fri',
+            'sat': 'Sat',
+            'sun': 'Sun'
+        }
+        working_days = []
+        # Create a set of doctor's working days for quick lookup
+        doctor_days = set(availability.day_of_week for availability in doctor.availability_list)
+        # Add days in correct order
+        for day in days_order:
+            if day in doctor_days and day in days_map:
+                working_days.append(days_map[day])
+        doctor.working_days = ', '.join(working_days)
     return render(request, 'admins/doctors.html', {'users': doctors, 'role': 'doctor'})
 
 @login_required
@@ -137,24 +164,31 @@ def edit_doctor(request, user_id):
             start_time = form.cleaned_data.get('start_time')
             end_time = form.cleaned_data.get('end_time')
 
-            from doctors.models import DoctorSchedule
+            from patients.models import TimeSlot
             from admins.models import DoctorAllocation
 
-            # Update or create DoctorSchedule
-            schedule, created = DoctorSchedule.objects.update_or_create(
-                doctor=user,
-                defaults={
-                    'work_monday': work_monday,
-                    'work_tuesday': work_tuesday,
-                    'work_wednesday': work_wednesday,
-                    'work_thursday': work_thursday,
-                    'work_friday': work_friday,
-                    'work_saturday': work_saturday,
-                    'work_sunday': work_sunday,
-                    'start_time': start_time,
-                    'end_time': end_time,
-                }
-            )
+            # Update or create TimeSlot for the doctor
+            # First, we need to create DoctorAvailability entries for each day the doctor works
+            from doctors.models import DoctorAvailability
+            
+            # Delete existing availability for this doctor
+            DoctorAvailability.objects.filter(doctor=user).delete()
+            
+            # Create new availability entries
+            if work_monday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='mon', start_time=start_time, end_time=end_time)
+            if work_tuesday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='tue', start_time=start_time, end_time=end_time)
+            if work_wednesday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='wed', start_time=start_time, end_time=end_time)
+            if work_thursday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='thu', start_time=start_time, end_time=end_time)
+            if work_friday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='fri', start_time=start_time, end_time=end_time)
+            if work_saturday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='sat', start_time=start_time, end_time=end_time)
+            if work_sunday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='sun', start_time=start_time, end_time=end_time)
 
             # Update or create DoctorAllocation
             allocation, created = DoctorAllocation.objects.update_or_create(
@@ -447,21 +481,24 @@ def add_doctor(request):
             start_time = form.cleaned_data.get('start_time')
             end_time = form.cleaned_data.get('end_time')
 
-            from doctors.models import DoctorSchedule
+            from doctors.models import DoctorAvailability
             from admins.models import DoctorAllocation
 
-            DoctorSchedule.objects.create(
-                doctor=user,
-                work_monday=work_monday,
-                work_tuesday=work_tuesday,
-                work_wednesday=work_wednesday,
-                work_thursday=work_thursday,
-                work_friday=work_friday,
-                work_saturday=work_saturday,
-                work_sunday=work_sunday,
-                start_time=start_time,
-                end_time=end_time
-            )
+            # Create DoctorAvailability entries for each day the doctor works
+            if work_monday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='mon', start_time=start_time, end_time=end_time)
+            if work_tuesday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='tue', start_time=start_time, end_time=end_time)
+            if work_wednesday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='wed', start_time=start_time, end_time=end_time)
+            if work_thursday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='thu', start_time=start_time, end_time=end_time)
+            if work_friday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='fri', start_time=start_time, end_time=end_time)
+            if work_saturday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='sat', start_time=start_time, end_time=end_time)
+            if work_sunday:
+                DoctorAvailability.objects.create(doctor=user, day_of_week='sun', start_time=start_time, end_time=end_time)
 
             DoctorAllocation.objects.create(
                 doctor=user,

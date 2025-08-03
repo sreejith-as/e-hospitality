@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+  <h2>Appointment Details</h2>
+  
+  <!-- Patient and Appointment Information -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">Patient: {{ appointment.patient.get_full_name }}</h5>
+      <p class="card-text"><strong>Date:</strong> {{ appointment.schedule.date }}</p>
+      <p class="card-text"><strong>Time:</strong> {{ appointment.schedule.start_time|time:"h:i A" }}</p>
+      <p class="card-text"><strong>Symptoms:</strong> {{ appointment.symptoms|default:"N/A" }}</p>
+      <p class="card-text"><strong>Status:</strong> {{ appointment.status }}</p>
+    </div>
+  </div>
+
+  <!-- Diagnosis Notes -->
+  {% if diagnosis_notes %}
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">Diagnosis Notes</h5>
+    </div>
+    <div class="card-body">
+      {% for note in diagnosis_notes %}
+      <div class="mb-3">
+        <p class="card-text">{{ note.note }}</p>
+        <small class="text-muted">Added on {{ note.created_at|date:"M d, Y H:i" }}</small>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Prescriptions -->
+  {% if prescriptions %}
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">Prescriptions</h5>
+    </div>
+    <div class="card-body">
+      {% for prescription in prescriptions %}
+      <div class="mb-3">
+        <p class="card-text"><strong>Medicine:</strong> {{ prescription.medication.name }}</p>
+        <p class="card-text"><strong>Dosage:</strong> {{ prescription.dosage }}</p>
+        <p class="card-text"><strong>Instructions:</strong> {{ prescription.instructions|default:"N/A" }}</p>
+        <small class="text-muted">Added on {{ prescription.created_at|date:"M d, Y H:i" }}</small>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Action Buttons -->
+  <div class="d-flex gap-2">
+    <a href="{% url 'doctors:appointment_details_update' appointment.id %}" class="btn btn-primary">Update Details</a>
+    <a href="{% url 'doctors:dashboard' %}#appointments" class="btn btn-secondary">Back to Dashboard</a>
+  </div>
+</div>
+{% endblock %}

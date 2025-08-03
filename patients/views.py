@@ -1,29 +1,37 @@
+# patients/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from accounts.models import CustomUser
-from .models import Billing, DoctorSchedule, Appointment, MedicalHistory
-from doctors.models import DoctorAvailability, Prescription
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from accounts.utils import role_required
-
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
+from .models import Billing, Appointment, MedicalHistory, TimeSlot
+from doctors.models import DoctorAvailability, Prescription
+from accounts.models import CustomUser
 from .forms import AppointmentBookingForm
-from django.http import JsonResponse
+from django.db.models import Sum, Count
+import json
 
+
+# -----------------------------
+# Patient Dashboard & Overview
+# -----------------------------
 @login_required
 @role_required('patient')
 def overview(request):
     user = request.user
     today = timezone.now().date()
-    upcoming_appointments = Appointment.objects.filter(patient=user, schedule__date__gte=today, status='booked').order_by('schedule__date', 'schedule__start_time')
+    upcoming_appointments = Appointment.objects.filter(
+        patient=user, schedule__date__gte=today, status='booked'
+    ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
     medical_records_count = MedicalHistory.objects.filter(patient=user).count()
     active_prescriptions = Prescription.objects.filter(patient=user).order_by('-created_at')[:5]
     unpaid_bills = Billing.objects.filter(patient=user, is_paid=False).order_by('due_date')
-    recent_activity = []  # Placeholder for recent activity, can be extended later
-
+    recent_activity = []  # Can be extended later
     context = {
         'upcoming_appointments': upcoming_appointments,
         'medical_records_count': medical_records_count,
@@ -33,214 +41,61 @@ def overview(request):
     }
     return render(request, 'patients/dashboard.html', context)
 
-@login_required
-@role_required('patient')
-def get_doctors_by_department(request):
-    department_id = request.GET.get('department_id')
-    doctors = CustomUser.objects.filter(role='doctor', doctorallocation__department_id=department_id).distinct()
-    doctor_list = [{'id': doc.id, 'username': doc.get_full_name()} for doc in doctors]
-    return JsonResponse({'doctors': doctor_list})
 
-@login_required
-@role_required('patient')
-def get_available_time_slots(request):
-    doctor_id = request.GET.get('doctor_id')
-    date = request.GET.get('date')
-    if not doctor_id or not date:
-        return JsonResponse({'error': 'Missing parameters'}, status=400)
-    # Fetch DoctorAvailability for the day of week
-    from datetime import datetime
-    day_of_week = datetime.strptime(date, '%Y-%m-%d').strftime('%a').lower()[:3]
-    availabilities = DoctorAvailability.objects.filter(doctor_id=doctor_id, day_of_week=day_of_week)
-    # Fetch already booked time slots for the doctor on the date
-    booked_slots = Appointment.objects.filter(doctor_id=doctor_id, schedule__date=date, status='booked').values_list('schedule__start_time', flat=True)
-    # Calculate available slots by excluding booked slots
-    available_slots = []
-    for availability in availabilities:
-        start = availability.start_time
-        end = availability.end_time
-        # Assuming 30-minute slots
-        from datetime import datetime, timedelta, time
-        current_time = datetime.combine(datetime.strptime(date, '%Y-%m-%d'), start)
-        end_time = datetime.combine(datetime.strptime(date, '%Y-%m-%d'), end)
-        while current_time + timedelta(minutes=30) <= end_time:
-            slot_time = current_time.time()
-            if slot_time not in booked_slots:
-                available_slots.append(slot_time.strftime('%H:%M'))
-            current_time += timedelta(minutes=30)
-    return JsonResponse({'available_slots': available_slots})
-
+# -----------------------------
+# Appointments
+# -----------------------------
 @login_required
 @role_required('patient')
 def appointments(request):
     user = request.user
     today = timezone.now().date()
-    upcoming_appointments = Appointment.objects.filter(patient=user, schedule__date__gte=today, status='booked').order_by('schedule__date', 'schedule__start_time')
-    past_appointments = Appointment.objects.filter(patient=user, schedule__date__lt=today).order_by('-schedule__date', '-schedule__start_time')
+    upcoming = Appointment.objects.filter(
+        patient=user, schedule__date__gte=today, status='booked'
+    ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
+    past = Appointment.objects.filter(
+        patient=user, schedule__date__lt=today
+    ).select_related('doctor', 'schedule').order_by('-schedule__date', '-schedule__start_time')
     context = {
-        'upcoming_appointments': upcoming_appointments,
-        'past_appointments': past_appointments,
+        'upcoming_appointments': upcoming,
+        'past_appointments': past,
     }
     return render(request, 'patients/appointments.html', context)
 
+
+# -----------------------------
+# Medical Records
+# -----------------------------
 @login_required
 @role_required('patient')
 def medical_records(request):
-    medical_history = MedicalHistory.objects.filter(patient=request.user).order_by('-updated_at')
+    medical_history = MedicalHistory.objects.filter(
+        patient=request.user
+    ).order_by('-updated_at')
     return render(request, 'patients/medical_records.html', {'medical_history': medical_history})
 
+
+# -----------------------------
+# Prescriptions
+# -----------------------------
 @login_required
 @role_required('patient')
 def prescriptions(request):
-    prescriptions = Prescription.objects.filter(patient=request.user).order_by('-created_at')
+    prescriptions = Prescription.objects.filter(
+        patient=request.user
+    ).order_by('-created_at')
     return render(request, 'patients/prescriptions.html', {'prescriptions': prescriptions})
 
+
+# -----------------------------
+# Billing & Payments
+# -----------------------------
 @login_required
 @role_required('patient')
 def billing(request):
     billings = Billing.objects.filter(patient=request.user).order_by('-due_date')
     return render(request, 'patients/billing.html', {'billings': billings})
 
-@login_required
-@role_required('patient')
-def health_education(request):
-    return render(request, 'patients/health_education.html')
-
-# Retain existing views for booking appointments etc.
-
-@login_required
-@role_required('patient')
-def book_appointment_form(request):
-    from datetime import datetime
-    if request.method == 'POST':
-        form = AppointmentBookingForm(request.POST)
-        if form.is_valid():
-            doctor = form.cleaned_data['doctor']
-            date = form.cleaned_data['date']
-            time = form.cleaned_data['time']
-            symptoms = form.cleaned_data['symptoms']
-            day_of_week = date.strftime('%a').lower()[:3]  # e.g., 'mon', 'tue'
-            availability = DoctorAvailability.objects.filter(doctor=doctor, day_of_week=day_of_week, start_time__lte=time, end_time__gte=time).first()
-            if not availability:
-                messages.error(request, f"Dr. {doctor.username} is not available on {date} at {time}. Please choose another time.")
-                return redirect('patients:book_appointment_form')
-            # Find or create DoctorSchedule for this date and time
-            schedule, created = DoctorSchedule.objects.get_or_create(
-                doctor=doctor,
-                date=date,
-                start_time=time,
-                end_time=time  # Assuming appointment duration is fixed or handled elsewhere
-            )
-            existing_appointment = Appointment.objects.filter(patient=request.user, schedule=schedule, status='booked').first()
-            if existing_appointment:
-                messages.error(request, 'You have already booked this appointment.')
-                return redirect('patients:overview')
-            Appointment.objects.create(
-                patient=request.user,
-                doctor=doctor,
-                schedule=schedule,
-                symptoms=symptoms,
-                status='booked'
-            )
-            messages.success(request, 'Appointment booked successfully.')
-            return redirect('patients:overview')
-    else:
-        form = AppointmentBookingForm()
-    return render(request, 'patients/book_appointment_form.html', {'form': form})
-
-@login_required
-@role_required('patient')
-def view_doctors_schedule(request):
-    doctors = CustomUser.objects.filter(role='doctor')
-    schedules = DoctorSchedule.objects.filter(doctor__in=doctors).order_by('date', 'start_time')
-    return render(request, 'patients/doctor_schedule.html', {'schedules': schedules})
-
-@login_required
-@role_required('patient')
-def book_appointment(request, schedule_id):
-    schedule = get_object_or_404(DoctorSchedule, id=schedule_id)
-    if request.method == 'POST':
-        existing_appointment = Appointment.objects.filter(patient=request.user, schedule=schedule, status='booked').first()
-        if existing_appointment:
-            messages.error(request, 'You have already booked this appointment.')
-            return redirect('patients:appointments')
-        Appointment.objects.create(
-            patient=request.user,
-            doctor=schedule.doctor,
-            schedule=schedule,
-            status='booked'
-        )
-        messages.success(request, 'Appointment booked successfully.')
-        return redirect('patients:appointments')
-    return render(request, 'patients/book_appointment.html', {'schedule': schedule})
-
-@login_required
-@role_required('patient')
-def book_appointment_form(request):
-    if request.method == 'POST':
-        form = AppointmentBookingForm(request.POST)
-        if form.is_valid():
-            doctor = form.cleaned_data['doctor']
-            date = form.cleaned_data['date']
-            symptoms = form.cleaned_data['symptoms']
-            schedule = DoctorSchedule.objects.filter(doctor=doctor, date=date).first()
-            if not schedule:
-                messages.error(request, f"No available schedule for Dr. {doctor.username} on {date}.")
-                return redirect('patients:book_appointment_form')
-            existing_appointment = Appointment.objects.filter(patient=request.user, schedule=schedule, status='booked').first()
-            if existing_appointment:
-                messages.error(request, 'You have already booked this appointment.')
-                return redirect('patients:overview')
-            Appointment.objects.create(
-                patient=request.user,
-                doctor=doctor,
-                schedule=schedule,
-                symptoms=symptoms,
-                status='booked'
-            )
-            messages.success(request, 'Appointment booked successfully.')
-            return redirect('patients:overview')
-    else:
-        form = AppointmentBookingForm()
-    return render(request, 'patients/book_appointment_form.html', {'form': form})
-
-@login_required
-@role_required('patient')
-def view_doctors_schedule(request):
-    doctors = CustomUser.objects.filter(role='doctor')
-    schedules = DoctorSchedule.objects.filter(doctor__in=doctors).order_by('date', 'start_time')
-    return render(request, 'patients/doctor_schedule.html', {'schedules': schedules})
-
-@login_required
-@role_required('patient')
-def book_appointment(request, schedule_id):
-    schedule = get_object_or_404(DoctorSchedule, id=schedule_id)
-    if request.method == 'POST':
-        existing_appointment = Appointment.objects.filter(patient=request.user, schedule=schedule, status='booked').first()
-        if existing_appointment:
-            messages.error(request, 'You have already booked this appointment.')
-            return redirect('patients:appointments')
-        Appointment.objects.create(
-            patient=request.user,
-            doctor=schedule.doctor,
-            schedule=schedule,
-            status='booked'
-        )
-        messages.success(request, 'Appointment booked successfully.')
-        return redirect('patients:appointments')
-    return render(request, 'patients/book_appointment.html', {'schedule': schedule})
-
-@login_required
-@role_required('patient')
-def medical_records(request):
-    medical_history = MedicalHistory.objects.filter(patient=request.user).order_by('-updated_at')
-    return render(request, 'patients/medical_records.html', {'medical_history': medical_history})
-
-@login_required
-@role_required('patient')
-def billing(request):
-    billings = Billing.objects.filter(patient=request.user).order_by('-due_date')
-    return render(request, 'patients/billing.html', {'billings': billings})
 
 @login_required
 @role_required('patient')
@@ -253,7 +108,182 @@ def pay_bill(request, billing_id):
         return redirect('patients:billing')
     return render(request, 'patients/pay_bill.html', {'billing': billing})
 
+
+# -----------------------------
+# Health Education
+# -----------------------------
 @login_required
 @role_required('patient')
 def health_education(request):
     return render(request, 'patients/health_education.html')
+
+
+# -----------------------------
+# AJAX: Get Doctors by Department
+# -----------------------------
+@require_GET
+@login_required
+@role_required('patient')
+def get_doctors_by_department(request):
+    department_id = request.GET.get('department_id')
+    if not department_id:
+        return JsonResponse({'doctors': []})
+    try:
+        # ✅ CORRECT: Use 'doctorallocation__department_id', not 'doctorallocation_set'
+        doctors = CustomUser.objects.filter(
+            role='doctor',
+            doctorallocation__department_id=department_id
+        ).distinct()
+    except:
+        return JsonResponse({'doctors': []})
+
+    doctor_list = [
+        {'id': doc.id, 'name': doc.get_full_name() or doc.username}
+        for doc in doctors
+    ]
+    return JsonResponse({'doctors': doctor_list})
+
+
+# -----------------------------
+# AJAX: Get Available Time Slots for Doctor on Date
+# -----------------------------
+@require_GET
+@login_required
+@role_required('patient')
+def get_available_time_slots(request):
+    doctor_id = request.GET.get('doctor_id')
+    date_str = request.GET.get('date')
+    if not doctor_id or not date_str:
+        return JsonResponse({'available_slots': []})
+    try:
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'available_slots': []})
+    today = timezone.now().date()
+    now_time = timezone.now().time()
+
+    # Prevent booking in the past
+    if selected_date < today:
+        return JsonResponse({'available_slots': []})
+
+    try:
+        doctor = CustomUser.objects.get(id=doctor_id, role='doctor')
+        day_of_week_short = selected_date.strftime('%a').lower()  # 'Monday' → 'mon'
+        availability = DoctorAvailability.objects.get(doctor=doctor, day_of_week=day_of_week_short)
+    except (CustomUser.DoesNotExist, DoctorAvailability.DoesNotExist):
+        return JsonResponse({'available_slots': []})
+
+    start_time = availability.start_time
+    end_time = availability.end_time
+
+    current = datetime.combine(selected_date, start_time)
+    end_dt = datetime.combine(selected_date, end_time)
+
+    # Get already booked time slots
+    booked_slots = Appointment.objects.filter(
+        doctor=doctor,
+        schedule__date=selected_date,
+        status='booked'
+    ).values_list('schedule__start_time', flat=True)
+    booked_times = {bt.strftime('%H:%M') for bt in booked_slots}
+
+    available_slots = []
+    while current + timedelta(minutes=30) <= end_dt:
+        slot_time = current.time()
+        slot_str = slot_time.strftime('%H:%M')
+
+        # Skip past times on today
+        if selected_date == today and slot_time < now_time:
+            current += timedelta(minutes=30)
+            continue
+
+        if slot_str not in booked_times:
+            available_slots.append(slot_str)
+
+        current += timedelta(minutes=30)
+
+    return JsonResponse({'available_slots': available_slots})
+
+
+# -----------------------------
+# Booking Form (Main View)
+# -----------------------------
+@login_required
+@role_required('patient')
+def book_appointment_form(request):
+    if request.method == 'POST':
+        form = AppointmentBookingForm(request.POST)
+        if form.is_valid():
+            doctor = form.cleaned_data['doctor']
+            date = form.cleaned_data['date']
+            time_obj = form.cleaned_data['time']
+            symptoms = form.cleaned_data['symptoms']
+
+            # Get or create the TimeSlot
+            end_time_obj = (datetime.combine(date, time_obj) + timedelta(minutes=30)).time()
+            time_slot, created = TimeSlot.objects.get_or_create(
+                doctor=doctor,
+                date=date,
+                start_time=time_obj,
+                defaults={'end_time': end_time_obj}
+            )
+
+            # Prevent double booking
+            if Appointment.objects.filter(schedule=time_slot, status='booked').exists():
+                messages.error(request, "This time slot is already booked.")
+                return redirect('patients:book_appointment_form')
+
+            # Create appointment
+            Appointment.objects.create(
+                patient=request.user,
+                doctor=doctor,
+                schedule=time_slot,
+                symptoms=symptoms,
+                status='booked'
+            )
+
+            messages.success(request, f'Appointment with Dr. {doctor.get_full_name()} booked successfully!')
+            return redirect('patients:overview')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+            for error in form.non_field_errors():
+                messages.error(request, error)
+    else:
+        form = AppointmentBookingForm()
+
+    return render(request, 'patients/book_appointment_form.html', {'form': form})
+
+
+# -----------------------------
+# View Doctor Schedules
+# -----------------------------
+@login_required
+@role_required('patient')
+def view_doctors_schedule(request):
+    doctors = CustomUser.objects.filter(role='doctor')
+    schedules = TimeSlot.objects.filter(doctor__in=doctors).order_by('date', 'start_time')
+    return render(request, 'patients/doctor_schedule.html', {'schedules': schedules})
+
+
+# -----------------------------
+# Direct Booking by Schedule ID (Optional)
+# -----------------------------
+@login_required
+@role_required('patient')
+def book_appointment(request, schedule_id):
+    schedule = get_object_or_404(TimeSlot, id=schedule_id)
+    if request.method == 'POST':
+        if Appointment.objects.filter(patient=request.user, schedule=schedule, status='booked').exists():
+            messages.error(request, 'You have already booked this appointment.')
+        else:
+            Appointment.objects.create(
+                patient=request.user,
+                doctor=schedule.doctor,
+                schedule=schedule,
+                status='booked'
+            )
+            messages.success(request, 'Appointment booked successfully.')
+        return redirect('patients:appointments')
+    return render(request, 'patients/book_appointment.html', {'schedule': schedule})

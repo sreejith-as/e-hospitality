@@ -2,6 +2,8 @@
 {% block content %}
 <h2>Doctors</h2>
 <a href="{% url 'admins:add_doctor' %}" class="btn btn-primary mb-3">Add New Doctor</a>
+<a href="{% url 'admins:user_management_landing' %}" class="btn btn-secondary mb-3">Back to Dashboard</a>
+
 <table class="table table-striped">
   <thead>
     <tr>
@@ -10,6 +12,8 @@
       <th>Phone Number</th>
       <th>Gender</th>
       <th>Department</th>
+      <th>Working Days</th>
+      <th>Working Hours</th>
       <th>Actions</th>
     </tr>
   </thead>
@@ -30,13 +34,32 @@
         {% endwith %}
       </td>
       <td>
+        {% if user.working_days %}
+          {{ user.working_days }}
+        {% else %}
+          N/A
+        {% endif %}
+      </td>
+      <td>
+        {% if user.availability_list %}
+          {% with first_schedule=user.availability_list.0 %}
+            {{ first_schedule.start_time|time:"H:i" }} - {{ first_schedule.end_time|time:"H:i" }}
+            {% if user.availability_list|length > 1 %}
+              *
+            {% endif %}
+          {% endwith %}
+        {% else %}
+          N/A
+        {% endif %}
+      </td>
+      <td>
         <a href="{% url 'admins:edit_doctor' user.id %}" class="btn btn-sm btn-warning">Edit</a>
         <a href="{% url 'admins:delete_doctor' user.id %}" class="btn btn-sm btn-danger">Delete</a>
       </td>
     </tr>
     {% empty %}
     <tr>
-      <td colspan="6">No doctors found.</td>
+      <td colspan="8">No doctors found.</td>
     </tr>
     {% endfor %}
   </tbody>

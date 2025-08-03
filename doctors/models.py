@@ -1,23 +1,42 @@
 from django.db import models
 from django.conf import settings
 
+
 class DiagnosisNote(models.Model):
-    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='diagnosis_notes')
-    doctor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='doctor_diagnosis_notes')
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='diagnosis_notes'
+    )
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='doctor_diagnosis_notes'
+    )
     note = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Diagnosis for {self.patient.username} by {self.doctor.username} on {self.created_at.strftime('%Y-%m-%d')}"
+        return f"Diagnosis for {self.patient.get_full_name()} by Dr. {self.doctor.get_full_name()} on {self.created_at.strftime('%Y-%m-%d')}"
+
 
 class Treatment(models.Model):
-    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='treatments')
-    doctor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='doctor_treatments')
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='treatments'
+    )
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='doctor_treatments'
+    )
     treatment_details = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Treatment for {self.patient.username} by {self.doctor.username} on {self.created_at.strftime('%Y-%m-%d')}"
+        return f"Treatment for {self.patient.get_full_name()} by Dr. {self.doctor.get_full_name()} on {self.created_at.strftime('%Y-%m-%d')}"
+
 
 class Medication(models.Model):
     name = models.CharField(max_length=255)
@@ -27,9 +46,18 @@ class Medication(models.Model):
     def __str__(self):
         return self.name
 
+
 class Prescription(models.Model):
-    patient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='prescriptions')
-    doctor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='doctor_prescriptions')
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='prescriptions'
+    )
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='doctor_prescriptions'
+    )
     medication = models.ForeignKey(Medication, on_delete=models.CASCADE)
     dosage = models.CharField(max_length=255)
     instructions = models.TextField(blank=True)
@@ -37,9 +65,14 @@ class Prescription(models.Model):
     status = models.CharField(max_length=50, default='Pending')  # e.g., Pending, Completed
 
     def __str__(self):
-        return f"Prescription of {self.medication.name} for {self.patient.username} by {self.doctor.username}"
+        return f"Prescription of {self.medication.name} for {self.patient.get_full_name()} by Dr. {self.doctor.get_full_name()}"
+
 
 class DoctorAvailability(models.Model):
+    """
+    Defines recurring weekly availability for a doctor.
+    Allows different hours per day.
+    """
     DAYS_OF_WEEK = [
         ('mon', 'Monday'),
         ('tue', 'Tuesday'),
@@ -49,44 +82,22 @@ class DoctorAvailability(models.Model):
         ('sat', 'Saturday'),
         ('sun', 'Sunday'),
     ]
-    doctor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='availabilities')
+
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='availabilities'
+    )
     day_of_week = models.CharField(max_length=3, choices=DAYS_OF_WEEK)
-    start_time = models.TimeField()
-    end_time = models.TimeField()
+    start_time = models.TimeField(help_text="Start of working hours")
+    end_time = models.TimeField(help_text="End of working hours")
 
     class Meta:
         unique_together = ('doctor', 'day_of_week', 'start_time', 'end_time')
+        verbose_name = "Doctor Availability"
+        verbose_name_plural = "Doctor Availabilities"
+        ordering = ['day_of_week']
 
     def __str__(self):
-        return f"{self.doctor.username} available on {self.get_day_of_week_display()} from {self.start_time.strftime('%H:%M')} to {self.end_time.strftime('%H:%M')}"
-
-class DoctorSchedule(models.Model):
-    doctor = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='schedule')
-    work_monday = models.BooleanField(default=False)
-    work_tuesday = models.BooleanField(default=False)
-    work_wednesday = models.BooleanField(default=False)
-    work_thursday = models.BooleanField(default=False)
-    work_friday = models.BooleanField(default=False)
-    work_saturday = models.BooleanField(default=False)
-    work_sunday = models.BooleanField(default=False)
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-
-    def __str__(self):
-        days = []
-        if self.work_monday:
-            days.append('Mon')
-        if self.work_tuesday:
-            days.append('Tue')
-        if self.work_wednesday:
-            days.append('Wed')
-        if self.work_thursday:
-            days.append('Thu')
-        if self.work_friday:
-            days.append('Fri')
-        if self.work_saturday:
-            days.append('Sat')
-        if self.work_sunday:
-            days.append('Sun')
-        days_str = ', '.join(days)
-        return f"{self.doctor.username} works on {days_str} from {self.start_time.strftime('%H:%M')} to {self.end_time.strftime('%H:%M')}"
+        display_day = self.get_day_of_week_display()
+        return f"{self.doctor.get_full_name()} available on {display_day} from {self.start_time.strftime('%H:%M')} to {self.end_time.strftime('%H:%M')}"

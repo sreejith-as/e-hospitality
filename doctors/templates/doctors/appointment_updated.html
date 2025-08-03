@@ -1,0 +1,52 @@
+{% extends "doctors/base_dashboard.html" %}
+
+{% block title %}Appointment Updated{% endblock %}
+
+{% block dashboard_content %}
+<div class="container py-4">
+  <h2>Appointment Details</h2>
+  
+  <!-- Patient and Appointment Information -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">Patient: {{ appointment.patient.get_full_name }}</h5>
+      <p class="card-text"><strong>Date:</strong> {{ appointment.schedule.date }}</p>
+      <p class="card-text"><strong>Time:</strong> {{ appointment.schedule.start_time|time:"h:i A" }}</p>
+      <p class="card-text"><strong>Symptoms:</strong> {{ appointment.symptoms|default:"N/A" }}</p>
+      <p class="card-text"><strong>Status:</strong> {{ appointment.status }}</p>
+    </div>
+  </div>
+
+  <!-- Diagnosis Note -->
+  {% if diagnosis_note %}
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">Diagnosis</h5>
+    </div>
+    <div class="card-body">
+      <p class="card-text">{{ diagnosis_note.note }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Prescription -->
+  {% if prescription %}
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">Prescription</h5>
+    </div>
+    <div class="card-body">
+      <p class="card-text"><strong>Medicine:</strong> {{ prescription.medication.name }}</p>
+      <p class="card-text"><strong>Dosage:</strong> {{ prescription.dosage }}</p>
+      <p class="card-text"><strong>Instructions:</strong> {{ prescription.instructions|default:"N/A" }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Action Buttons -->
+  <div class="d-flex gap-2">
+    <a href="{% url 'doctors:appointment_details' appointment.id %}" class="btn btn-primary">Edit Details</a>
+    <a href="{% url 'doctors:appointment_schedule' %}" class="btn btn-secondary">Back to Dashboard</a>
+  </div>
+</div>
+{% endblock %}

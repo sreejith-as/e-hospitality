@@ -49,8 +49,7 @@
               {% endif %}
             </td>
             <td>
-              <button class="btn btn-success btn-sm me-1">Complete</button>
-              <button class="btn btn-outline-primary btn-sm">Prescribe</button>
+              <a href="{% url 'doctors:appointment_details' appointment.id %}" class="btn btn-primary btn-sm">View Details</a>
             </td>
           </tr>
           {% empty %}
@@ -77,8 +76,7 @@
               </div>
             </div>
             <div class="d-flex gap-2">
-              <button class="btn btn-primary flex-fill"><i class="bi bi-capsule me-1"></i> Prescribe</button>
-              <button class="btn btn-outline-secondary flex-fill"><i class="bi bi-file-earmark-text me-1"></i> Add Record</button>
+              <a href="{% url 'doctors:patient_detail' patient.id %}" class="btn btn-primary flex-fill">View Details</a>
             </div>
           </div>
         </div>
@@ -111,14 +109,10 @@
 
             <dt class="col-sm-4">Working Days</dt>
             <dd class="col-sm-8">
-              {% if schedule %}
-                {% if schedule.work_monday %}Mon {% endif %}
-                {% if schedule.work_tuesday %}Tue {% endif %}
-                {% if schedule.work_wednesday %}Wed {% endif %}
-                {% if schedule.work_thursday %}Thu {% endif %}
-                {% if schedule.work_friday %}Fri {% endif %}
-                {% if schedule.work_saturday %}Sat {% endif %}
-                {% if schedule.work_sunday %}Sun {% endif %}
+              {% if availability %}
+                {% for avail in availability %}
+                  {{ avail.get_day_of_week_display }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
               {% else %}
                 Not set
               {% endif %}
@@ -126,8 +120,10 @@
 
             <dt class="col-sm-4">Working Hours</dt>
             <dd class="col-sm-8">
-              {% if schedule %}
-                {{ schedule.start_time|time:"H:i" }} - {{ schedule.end_time|time:"H:i" }}
+              {% if availability %}
+                {% with first_availability=availability.first %}
+                  {{ first_availability.start_time|time:"g:i A" }} - {{ first_availability.end_time|time:"g:i A" }}
+                {% endwith %}
               {% else %}
                 Not set
               {% endif %}

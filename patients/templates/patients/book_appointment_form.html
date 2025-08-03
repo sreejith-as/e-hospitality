@@ -1,108 +1,106 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
 <div class="container py-4">
   <div class="row justify-content-center">
-    <div class="col-lg-6 col-md-8 col-sm-10">
-      <!-- Compact Card -->
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-primary text-white text-center">
-          <h4 class="mb-0">
-            <i class="bi bi-calendar-plus me-1"></i> Book Appointment
-          </h4>
+    <div class="col-lg-8">
+      <h2><i class="bi bi-calendar-plus"></i> Book Appointment</h2>
+      <form method="post" id="booking-form">
+        {% csrf_token %}
+        <div class="mb-3">
+          {{ form.department.label_tag }}
+          {{ form.department }}
         </div>
-        <div class="card-body p-4">
-          <form method="post" novalidate id="appointment-form">
-            {% csrf_token %}
 
-            <!-- Department -->
-            <div class="mb-3">
-              <label for="{{ form.department.id_for_label }}" class="form-label small fw-bold text-secondary">
-                {{ form.department.label }}
-              </label>
-              <select name="{{ form.department.name }}" id="{{ form.department.id_for_label }}"
-                      class="form-select form-select-sm {% if form.department.errors %}is-invalid{% endif %}">
-                <option value="" disabled {% if not form.department.value %}selected{% endif %}>Choose Department</option>
-                {% for value, label in form.department.field.choices %}
-                  <option value="{{ value }}" {% if form.department.value == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-              {% for error in form.department.errors %}
-                <div class="invalid-feedback d-block"><small>{{ error }}</small></div>
-              {% endfor %}
-            </div>
-
-            <!-- Doctor -->
-            <div class="mb-3">
-              <label for="{{ form.doctor.id_for_label }}" class="form-label small fw-bold text-secondary">
-                {{ form.doctor.label }}
-              </label>
-              <select name="{{ form.doctor.name }}" id="{{ form.doctor.id_for_label }}"
-                      class="form-select form-select-sm {% if form.doctor.errors %}is-invalid{% endif %}">
-                <option value="" disabled {% if not form.doctor.value %}selected{% endif %}>Choose Doctor</option>
-              </select>
-              {% for error in form.doctor.errors %}
-                <div class="invalid-feedback d-block"><small>{{ error }}</small></div>
-              {% endfor %}
-            </div>
-
-            <!-- Date -->
-            <div class="mb-3">
-              <label for="{{ form.date.id_for_label }}" class="form-label small fw-bold text-secondary">
-                {{ form.date.label }}
-              </label>
-              <input type="date"
-                     name="{{ form.date.name }}"
-                     id="{{ form.date.id_for_label }}"
-                     value="{{ form.date.value|default:'' }}"
-                     class="form-control form-control-sm {% if form.date.errors %}is-invalid{% endif %}">
-              {% for error in form.date.errors %}
-                <div class="invalid-feedback d-block"><small>{{ error }}</small></div>
-              {% endfor %}
-            </div>
-
-            <!-- Time -->
-            <div class="mb-3">
-              <label for="{{ form.time.id_for_label }}" class="form-label small fw-bold text-secondary">
-                {{ form.time.label }}
-              </label>
-              <input type="time"
-                     name="{{ form.time.name }}"
-                     id="{{ form.time.id_for_label }}"
-                     value="{{ form.time.value|default:'' }}"
-                     class="form-control form-control-sm {% if form.time.errors %}is-invalid{% endif %}">
-              {% for error in form.time.errors %}
-                <div class="invalid-feedback d-block"><small>{{ error }}</small></div>
-              {% endfor %}
-            </div>
-
-            <!-- Symptoms -->
-            <div class="mb-3">
-              <label for="{{ form.symptoms.id_for_label }}" class="form-label small fw-bold text-secondary">
-                {{ form.symptoms.label }} <span class="text-muted">(Optional)</span>
-              </label>
-              <textarea name="{{ form.symptoms.name }}"
-                        id="{{ form.symptoms.id_for_label }}"
-                        rows="3"
-                        class="form-control form-control-sm {% if form.symptoms.errors %}is-invalid{% endif %}"
-                        placeholder="Briefly describe symptoms...">{{ form.symptoms.value|default:'' }}</textarea>
-              {% for error in form.symptoms.errors %}
-                <div class="invalid-feedback d-block"><small>{{ error }}</small></div>
-              {% endfor %}
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="d-flex gap-2 justify-content-end">
-              <a href="{% url 'patients:overview' %}" class="btn btn-outline-secondary btn-sm px-3">
-                <i class="bi bi-x-circle me-1"></i> Cancel
-              </a>
-              <button type="submit" class="btn btn-primary btn-sm px-3">
-                <i class="bi bi-calendar-check me-1"></i> Book
-              </button>
-            </div>
-          </form>
+        <div class="mb-3">
+          {{ form.doctor.label_tag }}
+          {{ form.doctor }}
         </div>
-      </div>
+
+        <div class="mb-3">
+          {{ form.date.label_tag }}
+          {{ form.date }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.time.label_tag }}
+          {{ form.time }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.symptoms.label_tag }}
+          {{ form.symptoms }}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Book Appointment</button>
+        <a href="{% url 'patients:overview' %}" class="btn btn-secondary">Cancel</a>
+      </form>
     </div>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const deptSelect = document.getElementById('id_department');
+  const doctorSelect = document.getElementById('id_doctor');
+  const dateInput = document.getElementById('id_date');
+  const timeSelect = document.getElementById('id_time');
+
+  deptSelect.addEventListener('change', function () {
+    const deptId = this.value;
+    doctorSelect.innerHTML = '<option value="">Loading...</option>';
+    timeSelect.innerHTML = '<option value="">Select date to load time slots</option>';
+
+    if (!deptId) {
+      doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
+      return;
+    }
+
+    fetch(`{% url 'patients:get_doctors_by_department' %}?department_id=${deptId}`)
+      .then(response => response.json())
+      .then(data => {
+        doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
+        data.doctors.forEach(d => {
+          const option = document.createElement('option');
+          option.value = d.id;
+          option.textContent = d.name;
+          doctorSelect.appendChild(option);
+        });
+      });
+  });
+
+  function updateTimeSlots() {
+    const doctorId = doctorSelect.value;
+    const date = dateInput.value;
+    if (!doctorId || !date) {
+      timeSelect.innerHTML = '<option value="">Select date and doctor</option>';
+      return;
+    }
+
+    timeSelect.innerHTML = '<option value="">Loading...</option>';
+    fetch(`{% url 'patients:get_available_time_slots' %}?doctor_id=${doctorId}&date=${date}`)
+      .then(response => response.json())
+      .then(data => {
+        timeSelect.innerHTML = '<option value="">Select Time</option>';
+        if (data.available_slots.length === 0) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No slots available';
+          option.disabled = true;
+          timeSelect.appendChild(option);
+        } else {
+          data.available_slots.forEach(slot => {
+            const option = document.createElement('option');
+            option.value = slot;
+            option.textContent = slot;
+            timeSelect.appendChild(option);
+          });
+        }
+      });
+  }
+
+  doctorSelect.addEventListener('change', updateTimeSlots);
+  dateInput.addEventListener('change', updateTimeSlots);
+});
+</script>
 {% endblock %}

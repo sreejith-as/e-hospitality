@@ -15,5 +15,7 @@ urlpatterns = [
     path('book-appointment-form/', views.book_appointment_form, name='book_appointment_form'),
     path('doctor-schedule/', views.view_doctors_schedule, name='view_doctors_schedule'),
     path('book-appointment/<int:schedule_id>/', views.book_appointment, name='book_appointment'),
+    path('get_doctors_by_department/', views.get_doctors_by_department, name='get_doctors_by_department'),
+    path('get_available_time_slots/', views.get_available_time_slots, name='get_available_time_slots'),
     path('dashboard/', RedirectView.as_view(url='/patients/overview/', permanent=True), name='dashboard_redirect'),
 ]

@@ -18,4 +18,13 @@ urlpatterns = [
 
     # Doctor schedule management
     path('schedule/', views.doctor_schedule_manage, name='doctor_schedule_manage'),
+
+    # Appointment details view (read-only)
+    path('appointments/<int:appointment_id>/', views.appointment_details, name='appointment_details'),
+    
+    # Appointment details update view
+    path('appointments/<int:appointment_id>/update/', views.appointment_details_update, name='appointment_details_update'),
+    
+    # Updated appointment details view
+    path('appointments/<int:appointment_id>/updated/', views.appointment_updated, name='appointment_updated'),
 ]
