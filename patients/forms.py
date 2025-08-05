@@ -3,13 +3,10 @@ from django import forms
 from .models import Appointment
 from django.contrib.auth import get_user_model
 from admins.models import Department
-
-User = get_user_model()
-
-from django import forms
-from .models import Appointment
-from django.contrib.auth import get_user_model
-from admins.models import Department
+from patients.models import TimeSlot, Appointment
+from doctors.models import DoctorAvailability
+from django.utils import timezone
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -25,6 +22,7 @@ class AppointmentBookingForm(forms.ModelForm):
         fields = ['department', 'doctor', 'date', 'time', 'symptoms']
 
     def __init__(self, *args, **kwargs):
+        self.instance = kwargs.get('instance')
         super().__init__(*args, **kwargs)
         # Populate departments
         self.fields['department'].choices = [('', 'Select Department')] + [
@@ -55,9 +53,6 @@ class AppointmentBookingForm(forms.ModelForm):
         time_obj = cleaned_data.get('time')
 
         if doctor and date and time_obj:
-            from doctors.models import DoctorAvailability
-            from django.utils import timezone
-            from datetime import timedelta
             
             # Get the day of week for the selected date
             day_of_week_short = date.strftime('%a').lower()  # e.g., 'mon', 'tue'
@@ -72,17 +67,24 @@ class AppointmentBookingForm(forms.ModelForm):
                 raise forms.ValidationError("Selected time is outside the doctor's working hours.")
             
             # Check if there's already an appointment at this time
-            from patients.models import TimeSlot, Appointment
             try:
                 time_slot = TimeSlot.objects.get(
                     doctor=doctor,
                     date=date,
                     start_time=time_obj
                 )
-                if Appointment.objects.filter(schedule=time_slot, status='booked').exists():
+                # 👉 Build query
+                appointment_query = Appointment.objects.filter(
+                    schedule=time_slot,
+                    status='booked'
+                )
+                # ✅ Exclude current appointment if editing
+                if self.instance and self.instance.pk:
+                    appointment_query = appointment_query.exclude(pk=self.instance.pk)
+
+                if appointment_query.exists():
                     raise forms.ValidationError("This time slot is already booked.")
             except TimeSlot.DoesNotExist:
-                # This is expected for new appointments - TimeSlot will be created in the view
-                pass
+                pass  # Will be created in view
                 
         return cleaned_data

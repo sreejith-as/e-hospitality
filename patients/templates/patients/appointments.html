@@ -1,34 +1,198 @@
-{% extends "patients/base_dashboard.html" %}
-{% block dashboard_content %}
-<h2>Appointments</h2>
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Appointment History</h2>
+    <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-2"></i>Book New Appointment
+    </a>
+  </div>
 
-<div class="mb-3">
-  <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book New Appointment</a>
+  <!-- Upcoming Appointments Section -->
+  <div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">
+        <i class="bi bi-calendar-check me-2"></i>Upcoming Appointments
+      </h5>
+    </div>
+    <div class="card-body">
+      {% if upcoming_appointments %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Doctor</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Reason/Symptoms</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for appointment in upcoming_appointments %}
+              <tr>
+                <td>
+                  <strong>Dr. {{ appointment.doctor.get_full_name }}</strong>
+                  <br>
+                  <small class="text-muted">{{ appointment.doctor.email }}</small>
+                </td>
+                <td>{{ appointment.schedule.date|date:"M d, Y" }}</td>
+                <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
+                <td>{{ appointment.symptoms|default:"Not specified"|truncatechars:50 }}</td>
+                <td>
+                  {% if appointment.status == 'booked' %}
+                    <span class="badge bg-primary">Scheduled</span>
+                  {% elif appointment.status == 'completed' %}
+                    <span class="badge bg-success">Completed</span>
+                  {% elif appointment.status == 'cancelled' %}
+                    <span class="badge bg-danger">Cancelled</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if appointment.status == 'booked' %}
+                    <div class="btn-group" role="group">
+                      <a href="{% url 'patients:edit_appointment' appointment.id %}" class="btn btn-sm btn-outline-primary" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                      <a href="{% url 'patients:cancel_appointment' appointment.id %}" class="btn btn-sm btn-outline-danger" title="Cancel">
+                        <i class="bi bi-x-circle"></i>
+                      </a>
+                    </div>
+                  {% else %}
+                    <span class="text-muted">No actions</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-4">
+          <i class="bi bi-calendar-x fs-1 text-muted"></i>
+          <p class="text-muted mt-2">No upcoming appointments found.</p>
+          <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book Your First Appointment</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Past Appointments Section -->
+  <div class="card">
+    <div class="card-header bg-success text-white">
+      <h5 class="mb-0">
+        <i class="bi bi-clock-history me-2"></i>Past Appointments
+      </h5>
+    </div>
+    <div class="card-body">
+      {% if past_appointments %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Doctor</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Reason/Symptoms</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for appointment in past_appointments %}
+              <tr>
+                <td>
+                  <strong>Dr. {{ appointment.doctor.get_full_name }}</strong>
+                  <br>
+                  <small class="text-muted">{{ appointment.doctor.email }}</small>
+                </td>
+                <td>{{ appointment.schedule.date|date:"M d, Y" }}</td>
+                <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
+                <td>{{ appointment.symptoms|default:"Not specified"|truncatechars:50 }}</td>
+                <td>
+                  {% if appointment.status == 'completed' %}
+                    <span class="badge bg-success">Completed</span>
+                  {% elif appointment.status == 'cancelled' %}
+                    <span class="badge bg-danger">Cancelled</span>
+                  {% else %}
+                    <span class="badge bg-secondary">{{ appointment.status|title }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="#" class="btn btn-sm btn-outline-info" title="View Details">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination Info -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+          <small class="text-muted">
+            Showing {{ past_appointments|length }} past appointment{{ past_appointments|length|pluralize }}
+          </small>
+          <div>
+            <button class="btn btn-sm btn-outline-secondary" disabled>
+              <i class="bi bi-download me-1"></i>Export PDF
+            </button>
+          </div>
+        </div>
+      {% else %}
+        <div class="text-center py-4">
+          <i class="bi bi-calendar-x fs-1 text-muted"></i>
+          <p class="text-muted mt-2">No past appointments found.</p>
+          <p class="text-muted">Your appointment history will appear here after your visits.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="row mt-4">
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title">{{ upcoming_appointments|length }}</h5>
+          <p class="card-text text-muted">Upcoming</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title">{{ past_appointments|length }}</h5>
+          <p class="card-text text-muted">Past</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title">{{ past_appointments|length|add:upcoming_appointments|length }}</h5>
+          <p class="card-text text-muted">Total</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title">
+            {% for appointment in past_appointments %}
+              {% if appointment.status == 'completed' %}
+                {% widthratio 1 1 1 as completed_count %}
+              {% endif %}
+            {% endfor %}
+            {{ completed_count|default:0 }}
+          </h5>
+          <p class="card-text text-muted">Completed</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
-
-<h4>Upcoming Appointments</h4>
-{% if upcoming_appointments %}
-  <ul class="list-group mb-4">
-    {% for appointment in upcoming_appointments %}
-      <li class="list-group-item">
-        Dr. {{ appointment.doctor.get_full_name }} - {{ appointment.schedule.date }} at {{ appointment.schedule.start_time }}
-      </li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p>No upcoming appointments.</p>
-{% endif %}
-
-<h4>Past Appointments</h4>
-{% if past_appointments %}
-  <ul class="list-group">
-    {% for appointment in past_appointments %}
-      <li class="list-group-item">
-        Dr. {{ appointment.doctor.get_full_name }} - {{ appointment.schedule.date }} at {{ appointment.schedule.start_time }}
-      </li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p>No past appointments.</p>
-{% endif %}
 {% endblock %}

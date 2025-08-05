@@ -17,7 +17,7 @@
   </div>
 
   <!-- Diagnosis Notes -->
-  {% if diagnosis_notes %}
+  {% if appointment.schedule.date <= today %}
   <div class="card mb-4">
     <div class="card-header">
       <h5 class="mb-0">Diagnosis Notes</h5>
@@ -34,7 +34,7 @@
   {% endif %}
 
   <!-- Prescriptions -->
-  {% if prescriptions %}
+  {% if appointment.schedule.date <= today %}
   <div class="card mb-4">
     <div class="card-header">
       <h5 class="mb-0">Prescriptions</h5>

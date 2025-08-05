@@ -1,4 +1,5 @@
 # patients/views.py
+from email.policy import default
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -8,13 +9,95 @@ from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from accounts.utils import role_required
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from .models import Billing, Appointment, MedicalHistory, TimeSlot
 from doctors.models import DoctorAvailability, Prescription
 from accounts.models import CustomUser
 from .forms import AppointmentBookingForm
 from django.db.models import Sum, Count
 import json
+
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from io import BytesIO
+
+
+
+
+
+
+
+
+# ... existing code ...
+
+@login_required
+@role_required('patient')
+def download_medical_history_pdf(request):
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y = height - 50
+
+    user = request.user
+    medical_history = MedicalHistory.objects.filter(patient=user).order_by('-updated_at')
+    prescriptions = Prescription.objects.filter(patient=user).select_related('medication', 'doctor').order_by('-created_at')
+    appointments = Appointment.objects.filter(patient=user).select_related('doctor', 'schedule').order_by('-schedule__date')
+
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, y, f"Medical History Report for {user.get_full_name()}")
+    y -= 30
+
+    p.setFont("Helvetica", 12)
+    p.drawString(50, y, f"Email: {user.email}")
+    y -= 20
+    p.drawString(50, y, f"Date of Birth: {user.date_of_birth.strftime('%Y-%m-%d') if user.date_of_birth else 'N/A'}")
+    y -= 20
+    p.drawString(50, y, f"Gender: {user.gender.title() if user.gender else 'N/A'}")
+    y -= 30
+
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y, "Medical History:")
+    y -= 20
+    p.setFont("Helvetica", 10)
+    for record in medical_history:
+        text = f"{record.updated_at.strftime('%Y-%m-%d')}: Diagnosis: {record.diagnosis}, Medications: {record.medications or 'None'}, Allergies: {record.allergies or 'None'}, Treatments: {record.treatments or 'None'}"
+        p.drawString(60, y, text)
+        y -= 15
+        if y < 50:
+            p.showPage()
+            y = height - 50
+
+    y -= 20
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y, "Prescriptions:")
+    y -= 20
+    p.setFont("Helvetica", 10)
+    for prescription in prescriptions:
+        text = f"{prescription.created_at.strftime('%Y-%m-%d')}: {prescription.medication.name}, Dosage: {prescription.dosage}, Instructions: {prescription.instructions or 'None'}, Prescribed by: Dr. {prescription.doctor.get_full_name()}"
+        p.drawString(60, y, text)
+        y -= 15
+        if y < 50:
+            p.showPage()
+            y = height - 50
+
+    y -= 20
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y, "Appointments:")
+    y -= 20
+    p.setFont("Helvetica", 10)
+    for appointment in appointments:
+        text = f"{appointment.schedule.date.strftime('%Y-%m-%d')}: Dr. {appointment.doctor.get_full_name()}, Time: {appointment.schedule.start_time.strftime('%H:%M')}, Status: {appointment.status.title()}"
+        p.drawString(60, y, text)
+        y -= 15
+        if y < 50:
+            p.showPage()
+            y = height - 50
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return HttpResponse(buffer, content_type='application/pdf')
 
 
 # -----------------------------
@@ -29,15 +112,54 @@ def overview(request):
         patient=user, schedule__date__gte=today, status='booked'
     ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
     medical_records_count = MedicalHistory.objects.filter(patient=user).count()
-    active_prescriptions = Prescription.objects.filter(patient=user).order_by('-created_at')[:5]
+    active_prescriptions = Prescription.objects.filter(
+        patient=user, 
+        status__in=['Active', 'Pending']
+    ).order_by('-created_at')[:5]
     unpaid_bills = Billing.objects.filter(patient=user, is_paid=False).order_by('due_date')
     recent_activity = []  # Can be extended later
+
+    # New counts for completed appointments and total prescriptions & diagnosis
+    completed_appointments_count = Appointment.objects.filter(
+        patient=user, status='completed'
+    ).count()
+    total_prescriptions_count = Prescription.objects.filter(
+        patient=user
+    ).count()
+    
+    # Completed appointments for dashboard display
+    completed_appointments = Appointment.objects.filter(
+        patient=user, status='completed'
+    ).select_related('doctor', 'schedule').order_by('-schedule__date', '-schedule__start_time')[:10]
+    
+    # Active prescriptions with unpaid bills
+    active_prescriptions_unpaid = []
+    unpaid_bills = Billing.objects.filter(patient=user, is_paid=False).order_by('due_date')
+    
+    # Link prescriptions to unpaid bills
+    for bill in unpaid_bills:
+        # Find prescriptions related to this bill (assuming description contains medication info)
+        related_prescriptions = Prescription.objects.filter(
+            patient=user,
+            medication__name__icontains=bill.description
+        )
+        
+        for prescription in related_prescriptions:
+            active_prescriptions_unpaid.append({
+                'prescription': prescription,
+                'bill': bill
+            })
+
     context = {
         'upcoming_appointments': upcoming_appointments,
         'medical_records_count': medical_records_count,
         'active_prescriptions': active_prescriptions,
+        'active_prescriptions_unpaid': active_prescriptions_unpaid,
         'unpaid_bills': unpaid_bills,
         'recent_activity': recent_activity,
+        'completed_appointments_count': completed_appointments_count,
+        'total_prescriptions_count': total_prescriptions_count,
+        'completed_appointments': completed_appointments,
     }
     return render(request, 'patients/dashboard.html', context)
 
@@ -50,15 +172,24 @@ def overview(request):
 def appointments(request):
     user = request.user
     today = timezone.now().date()
+
+    # Upcoming Appointments: booked and future/present (but not completed)
     upcoming = Appointment.objects.filter(
-        patient=user, schedule__date__gte=today, status='booked'
+        patient=user,
+        status='booked',
+        schedule__date__gte=today
     ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
-    past = Appointment.objects.filter(
-        patient=user, schedule__date__lt=today
+
+    # Past Appointments: only those with status = 'completed'
+    # (Assuming completed appointments are only for past or today's visits)
+    past_appointments = Appointment.objects.filter(
+        patient=user,
+        status='completed'
     ).select_related('doctor', 'schedule').order_by('-schedule__date', '-schedule__start_time')
+
     context = {
         'upcoming_appointments': upcoming,
-        'past_appointments': past,
+        'past_appointments': past_appointments,
     }
     return render(request, 'patients/appointments.html', context)
 
@@ -72,19 +203,166 @@ def medical_records(request):
     medical_history = MedicalHistory.objects.filter(
         patient=request.user
     ).order_by('-updated_at')
-    return render(request, 'patients/medical_records.html', {'medical_history': medical_history})
+    
+    prescriptions = Prescription.objects.filter(
+        patient=request.user
+    ).select_related('medication', 'doctor').order_by('-created_at')
+    
+    appointments = Appointment.objects.filter(
+        patient=request.user
+    ).select_related('doctor', 'schedule').order_by('-schedule__date')
+    
+    context = {
+        'medical_history': medical_history,
+        'prescriptions': prescriptions,
+        'appointments': appointments,
+    }
+    return render(request, 'patients/medical_records.html', context)
 
 
 # -----------------------------
-# Prescriptions
+# Visit Detail & PDF Download
 # -----------------------------
 @login_required
 @role_required('patient')
-def prescriptions(request):
-    prescriptions = Prescription.objects.filter(
+def visit_detail(request, appointment_id):
+    appointment = get_object_or_404(Appointment, id=appointment_id, patient=request.user)
+    
+    # Get related medical history for this visit
+    medical_history = MedicalHistory.objects.filter(
         patient=request.user
-    ).order_by('-created_at')
-    return render(request, 'patients/prescriptions.html', {'prescriptions': prescriptions})
+    ).order_by('-updated_at')[:5]
+    
+    # Get prescriptions for this visit
+    prescriptions = Prescription.objects.filter(
+        patient=request.user,
+        doctor=appointment.doctor
+    ).select_related('medication', 'doctor').order_by('-created_at')[:10]
+    
+    context = {
+        'appointment': appointment,
+        'medical_history': medical_history,
+        'prescriptions': prescriptions,
+    }
+    return render(request, 'patients/visit_detail.html', context)
+
+
+@login_required
+@role_required('patient')
+def download_visit_pdf(request, appointment_id):
+    appointment = get_object_or_404(Appointment, id=appointment_id, patient=request.user)
+    
+    # Get related data
+    medical_history = MedicalHistory.objects.filter(
+        patient=request.user
+    ).order_by('-updated_at')[:5]
+    
+    prescriptions = Prescription.objects.filter(
+        patient=request.user,
+        doctor=appointment.doctor
+    ).select_related('medication', 'doctor').order_by('-created_at')[:10]
+    
+    # Create PDF
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y = height - 100  # Start position
+
+    # Header
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, y, "Visit Details Report")
+    y -= 60
+
+    # Patient Info
+    p.setFont("Helvetica", 12)
+    p.drawString(50, y, f"Patient: {appointment.patient.get_full_name()}")
+    y -= 20
+    p.drawString(50, y, f"Email: {appointment.patient.email}")
+    y -= 20
+    dob = appointment.patient.date_of_birth
+    p.drawString(50, y, f"Date of Birth: {dob.strftime('%Y-%m-%d') if dob else 'N/A'}")
+    y -= 30
+
+    # Visit Details
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y, "Visit Information")
+    y -= 25
+
+    p.setFont("Helvetica", 11)
+    p.drawString(50, y, f"Doctor: Dr. {appointment.doctor.get_full_name()}")
+    y -= 15
+
+    # ✅ Fix: Use strftime() instead of |date
+    p.drawString(50, y, f"Date: {appointment.schedule.date.strftime('%b %d, %Y')}")
+    y -= 15
+
+    # ✅ Fix: Use strftime() for time
+    p.drawString(50, y, f"Time: {appointment.schedule.start_time.strftime('%I:%M %p')}")
+    y -= 15
+
+    p.drawString(50, y, "Duration: 30 minutes")
+    y -= 30
+
+    # Symptoms
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y, "Symptoms & Reason for Visit")
+    y -= 25
+
+    p.setFont("Helvetica", 11)
+    symptoms = appointment.symptoms or "Not specified"
+    p.drawString(50, y, f"Symptoms: {symptoms}")
+    y -= 30
+
+    # Medical History
+    if medical_history:
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(50, y, "Medical History")
+        y -= 25
+
+        p.setFont("Helvetica", 11)
+        for record in medical_history:
+            diagnosis = record.diagnosis or "Unknown"
+            p.drawString(50, y, f"Diagnosis: {diagnosis}")
+            y -= 15
+
+            treatment = record.treatments or "None"
+            p.drawString(50, y, f"Treatment: {treatment}")
+            y -= 20
+
+            if y < 100:
+                p.showPage()
+                y = height - 50
+
+    # Prescriptions
+    if prescriptions:
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(50, y, "Prescriptions")
+        y -= 25
+
+        p.setFont("Helvetica", 11)
+        for prescription in prescriptions:
+            p.drawString(50, y, f"Medication: {prescription.medication.name}")
+            y -= 15
+
+            p.drawString(50, y, f"Dosage: {prescription.dosage}")
+            y -= 15
+
+            instructions = prescription.instructions or "As directed"
+            p.drawString(50, y, f"Instructions: {instructions}")
+            y -= 20
+
+            if y < 100:
+                p.showPage()
+                y = height - 50
+
+    # Finalize PDF
+    p.save()
+    buffer.seek(0)
+
+    # Return as response
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="visit_{appointment.id}_{appointment.patient.username}.pdf"'
+    return response
 
 
 # -----------------------------
@@ -116,6 +394,67 @@ def pay_bill(request, billing_id):
 @role_required('patient')
 def health_education(request):
     return render(request, 'patients/health_education.html')
+
+def prescriptions(request):
+    """Display patient's prescriptions"""
+    return render(request, 'patients/prescriptions.html')
+
+
+# -----------------------------
+# Prescription PDF Download
+# -----------------------------
+@login_required
+@role_required('patient')
+def download_prescription_pdf(request, prescription_id):
+    prescription = get_object_or_404(Prescription, id=prescription_id, patient=request.user)
+    
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y = height - 50
+
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, y, f"Prescription Details")
+    y -= 30
+
+    p.setFont("Helvetica", 12)
+    p.drawString(50, y, f"Patient: {request.user.get_full_name()}")
+    y -= 20
+    p.drawString(50, y, f"Email: {request.user.email}")
+    y -= 20
+    p.drawString(50, y, f"Date of Birth: {request.user.date_of_birth.strftime('%Y-%m-%d') if request.user.date_of_birth else 'N/A'}")
+    y -= 30
+
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y, "Prescription Information:")
+    y -= 25
+
+    p.setFont("Helvetica", 11)
+    p.drawString(50, y, f"Medication: {prescription.medication.name}")
+    y -= 20
+    p.drawString(50, y, f"Dosage: {prescription.dosage}")
+    y -= 20
+    p.drawString(50, y, f"Instructions: {prescription.instructions or 'As directed by physician'}")
+    y -= 20
+    p.drawString(50, y, f"Prescribed by: Dr. {prescription.doctor.get_full_name()}")
+    y -= 20
+    p.drawString(50, y, f"Date Prescribed: {prescription.created_at.strftime('%Y-%m-%d')}")
+    y -= 20
+    p.drawString(50, y, f"Status: {prescription.status}")
+
+    # Add footer
+    y -= 50
+    p.setFont("Helvetica-Oblique", 10)
+    p.drawString(50, y, "This prescription was generated from the eHospital system.")
+    p.drawString(50, y-15, f"Generated on: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="prescription_{prescription.id}_{request.user.username}.pdf"'
+    return response
 
 
 # -----------------------------
@@ -287,3 +626,81 @@ def book_appointment(request, schedule_id):
             messages.success(request, 'Appointment booked successfully.')
         return redirect('patients:appointments')
     return render(request, 'patients/book_appointment.html', {'schedule': schedule})
+
+
+# -----------------------------
+# Cancel Appointment (Patient)
+# -----------------------------
+@login_required
+@role_required('patient')
+def cancel_appointment(request, appointment_id):
+    appointment = get_object_or_404(Appointment, id=appointment_id, patient=request.user)
+    
+    if request.method == 'POST':
+        # Only allow cancellation of booked appointments
+        if appointment.status == 'booked':
+            appointment.status = 'cancelled'
+            appointment.save()
+            messages.success(request, 'Appointment cancelled successfully.')
+        else:
+            messages.error(request, 'Cannot cancel this appointment.')
+        return redirect('patients:appointments')
+    
+    return render(request, 'patients/cancel_appointment.html', {'appointment': appointment})
+
+
+# -----------------------------
+# Edit Appointment (Patient)
+# -----------------------------
+@login_required
+@role_required('patient')
+def edit_appointment(request, appointment_id):
+    appointment = get_object_or_404(Appointment, id=appointment_id, patient=request.user)
+    
+    # Only allow editing of booked appointments
+    if appointment.status != 'booked':
+        messages.error(request, 'Cannot edit this appointment.')
+        return redirect('/patients/overview/#appointments')
+    
+    if request.method == 'POST':
+        form = AppointmentBookingForm(request.POST, instance=appointment)
+        if form.is_valid():
+            doctor = form.cleaned_data['doctor']
+            date = form.cleaned_data['date']
+            time_obj = form.cleaned_data['time']
+            symptoms = form.cleaned_data['symptoms']
+
+            # Get or create the TimeSlot
+            end_time_obj = (datetime.combine(date, time_obj) + timedelta(minutes=30)).time()
+            time_slot, created = TimeSlot.objects.get_or_create(
+                doctor=doctor,
+                date=date,
+                start_time=time_obj,
+                defaults={'end_time': end_time_obj}
+            )
+
+            # Update appointment
+            appointment.doctor = doctor
+            appointment.schedule = time_slot
+            appointment.symptoms = symptoms
+            appointment.save()
+
+            messages.success(request, f'Appointment with Dr. {doctor.get_full_name()} updated successfully!')
+            return redirect('/patients/overview/#appointments')
+        else:
+            # Handle form errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+            for error in form.non_field_errors():
+                messages.error(request, error)
+    else:
+        # Pre-populate form with existing appointment data
+        form = AppointmentBookingForm(initial={
+            'doctor': appointment.doctor,
+            'date': appointment.schedule.date,
+            'time': appointment.schedule.start_time,
+            'symptoms': appointment.symptoms
+        })
+
+    return render(request, 'patients/edit_appointment.html', {'form': form, 'appointment': appointment})

@@ -34,8 +34,12 @@ def doctor_dashboard(request):
 
     # Appointments
     appointments = Appointment.objects.filter(doctor=doctor).order_by('schedule__date', 'schedule__start_time')
-    scheduled_count = appointments.filter(status='booked').count()
-    completed_today_count = appointments.filter(status='completed', schedule__date=today).count()
+    todays_appointments = Appointment.objects.filter(doctor=doctor, schedule__date=today).order_by('schedule__start_time')
+    upcoming_appointments = Appointment.objects.filter(doctor=doctor, schedule__date__gt=today).order_by('schedule__date', 'schedule__start_time')
+    
+    todays_count = todays_appointments.count()
+    upcoming_count = upcoming_appointments.count()
+    appointments_count = appointments.count()
 
     # Patients
     patient_ids = appointments.values_list('patient_id', flat=True).distinct()
@@ -43,8 +47,11 @@ def doctor_dashboard(request):
 
     context = {
         'appointments': appointments,
-        'scheduled_count': scheduled_count,
-        'completed_today_count': completed_today_count,
+        'todays_appointments': todays_appointments,
+        'upcoming_appointments': upcoming_appointments,
+        'todays_count': todays_count,
+        'upcoming_count': upcoming_count,
+        'appointments_count': appointments_count,
         'patients': patients,
         'doctor': doctor,
         'doctor_allocation': doctor_allocation,
@@ -61,12 +68,64 @@ def doctor_dashboard(request):
 def todays_appointments(request):
     doctor = request.user
     today = date.today()
+    
+    # Get search query
+    search_query = request.GET.get('search', '')
+    
+    # Base queryset
     appointments = Appointment.objects.filter(
         doctor=doctor,
         schedule__date=today
     ).order_by('schedule__start_time')
-    context = {'appointments': appointments}
+    
+    # Apply search filters
+    if search_query:
+        appointments = appointments.filter(
+            patient__first_name__icontains=search_query
+        ) | appointments.filter(
+            patient__last_name__icontains=search_query
+        )
+    
+    context = {
+        'appointments': appointments,
+        'search_query': search_query,
+    }
     return render(request, 'doctors/todays_appointments.html', context)
+
+
+# -----------------------------
+# Upcoming Appointments
+# -----------------------------
+@login_required
+@role_required('doctor')
+def upcoming_appointments(request):
+    doctor = request.user
+    today = date.today()
+    
+    # Get search query
+    search_query = request.GET.get('search', '')
+    
+    # Base queryset
+    appointments = Appointment.objects.filter(
+        doctor=doctor,
+        schedule__date__gt=today
+    ).order_by('schedule__date', 'schedule__start_time')
+    
+    # Apply search filters
+    if search_query:
+        appointments = appointments.filter(
+            patient__first_name__icontains=search_query
+        ) | appointments.filter(
+            patient__last_name__icontains=search_query
+        ) | appointments.filter(
+            schedule__date__icontains=search_query
+        )
+    
+    context = {
+        'appointments': appointments,
+        'search_query': search_query,
+    }
+    return render(request, 'doctors/upcoming_appointments.html', context)
 
 
 # -----------------------------
@@ -219,8 +278,29 @@ def medication_list(request):
 @login_required
 @role_required('doctor')
 def appointment_schedule(request):
-    appointments = Appointment.objects.filter(doctor=request.user).order_by('schedule__date', 'schedule__start_time')
-    return render(request, 'doctors/appointment_schedule.html', {'appointments': appointments})
+    doctor = request.user
+    
+    # Get search query
+    search_query = request.GET.get('search', '')
+    
+    # Base queryset
+    appointments = Appointment.objects.filter(doctor=doctor).order_by('schedule__date', 'schedule__start_time')
+    
+    # Apply search filters
+    if search_query:
+        appointments = appointments.filter(
+            patient__first_name__icontains=search_query
+        ) | appointments.filter(
+            patient__last_name__icontains=search_query
+        ) | appointments.filter(
+            schedule__date__icontains=search_query
+        )
+    
+    context = {
+        'appointments': appointments,
+        'search_query': search_query,
+    }
+    return render(request, 'doctors/appointment_schedule.html', context)
 
 
 # -----------------------------
@@ -355,6 +435,14 @@ def appointment_details(request, appointment_id):
 @role_required('doctor')
 def appointment_details_update(request, appointment_id):
     appointment = get_object_or_404(Appointment, id=appointment_id, doctor=request.user)
+    
+    # Check if appointment is scheduled for today
+    today = date.today()
+    appointment_date = appointment.schedule.date
+    
+    if appointment_date != today:
+        messages.error(request, 'You can only add diagnosis and prescription for appointments scheduled for today.')
+        return redirect('doctors:appointment_details', appointment_id=appointment_id)
     
     if request.method == 'POST':
         action = request.POST.get('action')
