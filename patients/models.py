@@ -55,21 +55,37 @@ class Appointment(models.Model):
         return f"Appointment: {self.patient.get_full_name()} with Dr. {self.doctor.get_full_name()} on {self.schedule.date} at {self.schedule.start_time}"
 
 
-class MedicalHistory(models.Model):
+class MedicalVisit(models.Model):  # Better name than MedicalHistory
     patient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         limit_choices_to={'role': 'patient'}
     )
-    diagnosis = models.TextField()
-    medications = models.TextField(blank=True)
-    allergies = models.TextField(blank=True)
-    treatments = models.TextField(blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        limit_choices_to={'role': 'doctor'},
+        related_name='visit_notes'
+    )
+    appointment = models.ForeignKey(
+        'Appointment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    diagnosis = models.CharField(max_length=255)  # e.g., "Viral Fever"
+    symptoms = models.TextField(blank=True, null=True)
+    medications_prescribed = models.TextField(blank=True)  # Optional summary
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Medical History for {self.patient.get_full_name()} (Last updated: {self.updated_at.strftime('%Y-%m-%d')})"
+        return f"{self.diagnosis} - {self.patient.get_full_name()} - {self.created_at.date()}"
 
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Medical Visit"
+        verbose_name_plural = "Medical Visits"
 
 class Billing(models.Model):
     patient = models.ForeignKey(
@@ -83,6 +99,23 @@ class Billing(models.Model):
     due_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # ✅ Add these for better tracking
+    appointment = models.ForeignKey(
+        'Appointment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    status = models.CharField(
+        max_length=50,
+        default='pending',
+        choices=[
+            ('pending', 'Pending'),
+            ('paid', 'Paid'),
+            ('cancelled', 'Cancelled')
+        ]
+    )
+
     def __str__(self):
         status = "Paid" if self.is_paid else "Unpaid"
-        return f"Billing for {self.patient.get_full_name()} - {status} - Amount: ${self.amount}"
+        return f"Billing for {self.patient.get_full_name()} - {status} - Amount: ₹{self.amount}"

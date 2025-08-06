@@ -55,4 +55,11 @@ urlpatterns = [
 
     # Financial
     path('create-invoice/', views.create_invoice, name='create_invoice'),
+
+    # medicine
+    path('add-medication/', views.add_medication_with_stock, name='add_medication_with_stock'),
+    path('medications/', views.manage_medications, name='manage_medications'),
+    path('medications/edit/<int:med_id>/', views.edit_medication, name='edit_medication'),
+    path('medications/deactivate/<int:med_id>/', views.deactivate_medication, name='deactivate_medication'),
+    path('medications/activate/<int:med_id>/', views.activate_medication, name='activate_medication'),
 ]

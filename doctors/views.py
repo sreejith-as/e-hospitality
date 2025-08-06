@@ -4,14 +4,17 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
 from django.utils import timezone
-from datetime import date
+from datetime import date, timedelta
 from accounts.utils import role_required
-from accounts.models import CustomUser
-from patients.models import Appointment, MedicalHistory
+from accounts.models import CustomUser 
 from .models import DiagnosisNote, Treatment, Medication, Prescription, DoctorAvailability
 from .forms import DoctorAvailabilityForm, DoctorProfileUpdateForm
 from admins.models import DoctorAllocation, Department
-
+from django.core.paginator import Paginator
+from django.http import HttpResponseRedirect
+from .models import  Medication, Prescription
+from patients.models import Appointment, Billing, MedicalVisit
+from django.db.models import Q, Case, When, Value, IntegerField
 
 # -----------------------------
 # Doctor Dashboard
@@ -59,39 +62,53 @@ def doctor_dashboard(request):
     }
     return render(request, 'doctors/doctor_dashboard.html', context)
 
-
 # -----------------------------
 # Today's Appointments
 # -----------------------------
 @login_required
 @role_required('doctor')
 def todays_appointments(request):
-    doctor = request.user
-    today = date.today()
-    
-    # Get search query
-    search_query = request.GET.get('search', '')
-    
-    # Base queryset
-    appointments = Appointment.objects.filter(
-        doctor=doctor,
-        schedule__date=today
-    ).order_by('schedule__start_time')
-    
-    # Apply search filters
-    if search_query:
-        appointments = appointments.filter(
-            patient__first_name__icontains=search_query
-        ) | appointments.filter(
-            patient__last_name__icontains=search_query
-        )
-    
-    context = {
-        'appointments': appointments,
-        'search_query': search_query,
-    }
-    return render(request, 'doctors/todays_appointments.html', context)
+    today = timezone.now().date()
 
+    # Fetch all today's appointments
+    appointments_list = Appointment.objects.filter(
+        doctor=request.user,
+        schedule__date=today
+    ).select_related('patient', 'schedule')
+
+    # Define doctor's working hours end (e.g., 6:00 PM)
+    doctor_end_time = timezone.datetime.combine(today, timezone.datetime.strptime("18:00", "%H:%M").time())
+    now = timezone.now()
+
+    # Auto-cancel no-shows
+    for appt in appointments_list:
+        if appt.status == 'booked':
+            has_prescription = Prescription.objects.filter(appointment=appt).exists()
+            is_after_shift = now > doctor_end_time
+            is_time_passed = appt.schedule.start_time < now.time()
+
+            if is_after_shift and is_time_passed and not has_prescription:
+                appt.status = 'cancelled'
+                appt.save()
+
+    # ✅ Sort in Python (safe after auto-cancel)
+    sorted_appointments = sorted(
+        appointments_list,
+        key=lambda x: {'booked': 1, 'completed': 2, 'cancelled': 3}.get(x.status, 4)
+    )
+
+    # Pagination
+    paginator = Paginator(sorted_appointments, 10)
+    page_number = request.GET.get('page')
+    appointments = paginator.get_page(page_number)
+
+    all_medicines = Medication.objects.filter(is_active=True)
+
+    return render(request, 'doctors/todays_appointments.html', {
+        'appointments': appointments,
+        'search_query': request.GET.get('search', ''),
+        'all_medicines': all_medicines,
+    })
 
 # -----------------------------
 # Upcoming Appointments
@@ -169,7 +186,7 @@ def patient_detail(request, patient_id):
     patient = get_object_or_404(CustomUser, id=patient_id, role='patient')
     diagnosis_notes = DiagnosisNote.objects.filter(patient=patient)
     treatments = Treatment.objects.filter(patient=patient)
-    medical_history = MedicalHistory.objects.filter(patient=patient)
+    medical_history = MedicalVisit.objects.filter(patient=patient)
     prescriptions = Prescription.objects.filter(patient=patient)
     appointments = Appointment.objects.filter(patient=patient).order_by('-schedule__date')
 
@@ -234,33 +251,88 @@ def add_treatment(request, patient_id):
 # -----------------------------
 # Add Prescription
 # -----------------------------
+
 @login_required
 @role_required('doctor')
-def add_prescription(request, patient_id):
-    patient = get_object_or_404(CustomUser, id=patient_id, role='patient')
-    medications = Medication.objects.all()
-    if request.method == 'POST':
-        medication_id = request.POST.get('medication')
-        dosage = request.POST.get('dosage')
-        instructions = request.POST.get('instructions')
-        if medication_id and dosage:
-            medication = get_object_or_404(Medication, id=medication_id)
-            Prescription.objects.create(
-                patient=patient,
-                doctor=request.user,
-                medication=medication,
-                dosage=dosage,
-                instructions=instructions or ''
-            )
-            messages.success(request, 'Prescription added successfully.')
-            return redirect('doctors:patient_detail', patient_id=patient.id)
-        else:
-            messages.error(request, 'Medication and dosage are required.')
-    return render(request, 'doctors/add_prescription.html', {
-        'patient': patient,
-        'medications': medications,
-    })
+def prescribe_for_appointment(request, appointment_id):
+    appointment = get_object_or_404(Appointment, id=appointment_id, doctor=request.user)
 
+    if request.method == 'POST':
+        # Get diagnosis from form
+        diagnosis = request.POST.get('diagnosis')
+        if not diagnosis:
+            messages.error(request, "Diagnosis is required.")
+            return redirect('doctors:todays_appointments')
+
+        # Save Medical Visit
+        MedicalVisit.objects.create(
+            patient=appointment.patient,
+            doctor=request.user,
+            appointment=appointment,
+            diagnosis=diagnosis,
+            symptoms=appointment.symptoms,
+            notes="Prescribed via appointment"
+        )
+
+        # Process medicines...
+        i = 0
+        total_amount = 0
+        prescriptions_created = 0
+
+        while True:
+            med_id = request.POST.get(f'med_{i}_id')
+            if not med_id:
+                break
+
+            try:
+                medication = Medication.objects.get(id=med_id, is_active=True)
+                dosage = request.POST.get(f'med_{i}_dosage')
+                frequency = request.POST.get(f'med_{i}_frequency')
+                duration_days = int(request.POST.get(f'med_{i}_duration'))
+                quantity = int(request.POST.get(f'med_{i}_quantity'))
+                instructions = request.POST.get(f'med_{i}_instructions', '')
+
+                line_total = medication.price * quantity
+
+                Prescription.objects.create(
+                    appointment=appointment,
+                    patient=appointment.patient,
+                    doctor=request.user,
+                    medication=medication,
+                    dosage=dosage,
+                    frequency=frequency,
+                    duration_days=duration_days,
+                    quantity=quantity,
+                    instructions=instructions,
+                    line_total=line_total
+                )
+                total_amount += line_total
+                prescriptions_created += 1
+
+            except (Medication.DoesNotExist, ValueError):
+                pass
+            i += 1
+
+        if prescriptions_created > 0:
+            if appointment.status == 'booked':
+                appointment.status = 'completed'
+                appointment.save()
+
+            Billing.objects.create(
+                patient=appointment.patient,
+                amount=total_amount,
+                description=f"Prescription for {prescriptions_created} medicine(s)",
+                is_paid=False,
+                due_date=timezone.now().date(),
+                appointment=appointment
+            )
+            messages.success(request, f"Diagnosis and prescription saved. Total: ₹{total_amount:.2f}")
+        else:
+            messages.error(request, "No valid prescriptions to save.")
+
+        return redirect('doctors:todays_appointments')
+
+    return redirect('doctors:todays_appointments')
 
 # -----------------------------
 # Medication List
@@ -430,7 +502,7 @@ def appointment_details(request, appointment_id):
         'prescriptions': prescriptions,
     }
     return render(request, 'doctors/appointment_details_readonly.html', context)
- 
+
 @login_required
 @role_required('doctor')
 def appointment_details_update(request, appointment_id):

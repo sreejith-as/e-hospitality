@@ -8,6 +8,10 @@ from accounts.utils import role_required
 from django.utils.timezone import now
 from django.db.models import Count, Sum
 from patients.models import Appointment, Billing
+from accounts.forms import PatientRegistrationForm, DoctorRegistrationForm, AdminRegistrationForm
+from doctors.models import Medication, MedicineInventory
+from doctors.forms import MedicationForm
+from django.core.paginator import Paginator
 
 
 @login_required
@@ -26,6 +30,11 @@ def dashboard(request):
     departments = Department.objects.all()
     billings = Billing.objects.all()
 
+    medications_list = Medication.objects.all().order_by('name')
+    paginator = Paginator(medications_list, 10)
+    page_number = request.GET.get('page')
+    medications = paginator.get_page(page_number)
+
     context = {
         'total_patients': total_patients,
         'total_doctors': total_doctors,
@@ -36,6 +45,7 @@ def dashboard(request):
         'todays_appointments_list': todays_appointments_list,
         'departments': departments,
         'billings': billings,
+        'medications': medications,
     }
     return render(request, 'admins/dashboard.html', context)
 
@@ -430,20 +440,6 @@ def add_doctor_allocation(request):
         'rooms': rooms
     })
 
-
-# ✅ New: Add user (kept clean)
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden
-from django.contrib import messages
-from accounts.models import CustomUser
-from .models import Department, Room, Resource, DoctorAllocation
-from accounts.utils import role_required
-from django.utils.timezone import now
-from django.db.models import Count, Sum
-from patients.models import Appointment, Billing
-from accounts.forms import PatientRegistrationForm, DoctorRegistrationForm, AdminRegistrationForm
-
 @login_required
 @role_required('admin')
 def add_patient(request):
@@ -543,3 +539,104 @@ def reset_user_password(request, user_id):
         else:
             messages.error(request, 'New password is required.')
     return render(request, 'admins/reset_user_password.html', {'user': user})
+
+@role_required('admin')
+def manage_medications(request):
+    medications_list = Medication.objects.all().order_by('name')
+    paginator = Paginator(medications_list, 10)  # 10 per page
+    page_number = request.GET.get('page')
+    medications = paginator.get_page(page_number)
+
+    if request.method == 'POST':
+        form = MedicationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Medication '{form.cleaned_data['name']}' added successfully.")
+            return redirect('admins:manage_medications')
+    else:
+        form = MedicationForm()
+
+    return render(request, 'admins/dashboard.html', {
+        'medications': medications,
+        'form': form,
+    })
+
+@role_required('admin')
+def add_medication_with_stock(request):
+    if request.method == 'POST':
+        # Medicine data
+        name = request.POST.get('name')
+        price = request.POST.get('price')
+        unit = request.POST.get('unit', 'tablet')
+        safety_warnings = request.POST.get('safety_warnings', '')
+
+        # Stock data
+        quantity = request.POST.get('quantity')
+        batch_number = request.POST.get('batch_number', '')
+        expiry_date = request.POST.get('expiry_date', None)
+
+        # Validate
+        try:
+            price = float(price)
+            quantity = int(quantity)
+            if quantity < 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid price or quantity.")
+            return redirect('admins:dashboard')
+
+        # Create medicine
+        medicine = Medication.objects.create(
+            name=name,
+            price=price,
+            unit=unit,
+            safety_warnings=safety_warnings
+        )
+
+        # If quantity > 0, create inventory entry
+        if quantity > 0:
+            MedicineInventory.objects.create(
+                medicine=medicine,
+                quantity=quantity,
+                batch_number=batch_number,
+                expiry_date=expiry_date
+            )
+
+        messages.success(request, f"Medicine '{name}' added with {quantity} units in stock.")
+        return redirect('admins:dashboard')  # Redirect back to #medications tab
+
+    return redirect('admins:dashboard')
+
+@role_required('admin')
+def edit_medication(request, med_id):
+    medication = get_object_or_404(Medication, id=med_id)
+    
+    if request.method == 'POST':
+        form = MedicationForm(request.POST, instance=medication)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Medication '{medication.name}' updated.")
+            return redirect('admins:manage_medications')
+    else:
+        form = MedicationForm(instance=medication)
+    
+    return render(request, 'admins/edit_medication.html', {
+        'form': form,
+        'medication': medication
+    })
+
+@role_required('admin')
+def deactivate_medication(request, med_id):
+    medication = get_object_or_404(Medication, id=med_id)
+    medication.is_active = False
+    medication.save()
+    messages.success(request, f"Medication '{medication.name}' deactivated.")
+    return redirect('admins:manage_medications')
+
+@role_required('admin')
+def activate_medication(request, med_id):
+    medication = get_object_or_404(Medication, id=med_id)
+    medication.is_active = True
+    medication.save()
+    messages.success(request, f"Medication '{medication.name}' reactivated.")
+    return redirect('admins:manage_medications')

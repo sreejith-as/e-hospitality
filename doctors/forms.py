@@ -3,6 +3,7 @@ from django import forms
 from .models import DoctorAvailability, Prescription
 from admins.models import Department
 from accounts.models import CustomUser
+from .models import Medication
 
 # -----------------------------
 # Form for Doctor Availability (replaces DoctorScheduleForm)
@@ -111,4 +112,13 @@ class PrescriptionForm(forms.ModelForm):
         fields = ['medication', 'dosage', 'instructions']
         widgets = {
             'instructions': forms.Textarea(attrs={'rows': 3}),
+        }
+
+class MedicationForm(forms.ModelForm):
+    class Meta:
+        model = Medication
+        fields = ['name', 'description', 'safety_warnings', 'price', 'unit']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 2}),
+            'safety_warnings': forms.Textarea(attrs={'rows': 2}),
         }

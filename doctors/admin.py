@@ -54,11 +54,15 @@ class TreatmentAdmin(admin.ModelAdmin):
 
 @admin.register(Medication)
 class MedicationAdmin(admin.ModelAdmin):
-    list_display = ['name']
-    search_fields = ['name']
-
+    list_display = ('name', 'price', 'unit', 'is_active')
+    list_filter = ('is_active', 'unit')
+    search_fields = ('name', 'description')
+    ordering = ('name',)
 
 @admin.register(Prescription)
 class PrescriptionAdmin(admin.ModelAdmin):
-    list_display = ['patient', 'medication', 'dosage', 'doctor', 'created_at']
-    list_filter = ['created_at', 'doctor', 'medication']
+    list_display = ('patient', 'medication', 'dosage', 'quantity', 'line_total', 'status', 'created_at')
+    list_filter = ('status', 'medication', 'created_at')
+    search_fields = ('patient__username', 'medication__name', 'instructions')
+    readonly_fields = ('line_total', 'created_at')
+    autocomplete_fields = ('patient', 'medication')

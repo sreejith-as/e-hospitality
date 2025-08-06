@@ -10,7 +10,7 @@ from django.contrib.auth.forms import UserCreationForm
 from accounts.utils import role_required
 from django.utils import timezone
 from datetime import date, datetime, time, timedelta
-from .models import Billing, Appointment, MedicalHistory, TimeSlot
+from .models import Billing, Appointment, MedicalVisit, TimeSlot
 from doctors.models import DoctorAvailability, Prescription
 from accounts.models import CustomUser
 from .forms import AppointmentBookingForm
@@ -22,15 +22,6 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from io import BytesIO
 
-
-
-
-
-
-
-
-# ... existing code ...
-
 @login_required
 @role_required('patient')
 def download_medical_history_pdf(request):
@@ -40,7 +31,7 @@ def download_medical_history_pdf(request):
     y = height - 50
 
     user = request.user
-    medical_history = MedicalHistory.objects.filter(patient=user).order_by('-updated_at')
+    medical_history = MedicalVisit.objects.filter(patient=user).order_by('-updated_at')
     prescriptions = Prescription.objects.filter(patient=user).select_related('medication', 'doctor').order_by('-created_at')
     appointments = Appointment.objects.filter(patient=user).select_related('doctor', 'schedule').order_by('-schedule__date')
 
@@ -111,7 +102,7 @@ def overview(request):
     upcoming_appointments = Appointment.objects.filter(
         patient=user, schedule__date__gte=today, status='booked'
     ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
-    medical_records_count = MedicalHistory.objects.filter(patient=user).count()
+    medical_records_count = MedicalVisit.objects.filter(patient=user).count()
     active_prescriptions = Prescription.objects.filter(
         patient=user, 
         status__in=['Active', 'Pending']
@@ -200,7 +191,7 @@ def appointments(request):
 @login_required
 @role_required('patient')
 def medical_records(request):
-    medical_history = MedicalHistory.objects.filter(
+    medical_history = MedicalVisit.objects.filter(
         patient=request.user
     ).order_by('-updated_at')
     
@@ -229,7 +220,7 @@ def visit_detail(request, appointment_id):
     appointment = get_object_or_404(Appointment, id=appointment_id, patient=request.user)
     
     # Get related medical history for this visit
-    medical_history = MedicalHistory.objects.filter(
+    medical_history = MedicalVisit.objects.filter(
         patient=request.user
     ).order_by('-updated_at')[:5]
     
@@ -253,7 +244,7 @@ def download_visit_pdf(request, appointment_id):
     appointment = get_object_or_404(Appointment, id=appointment_id, patient=request.user)
     
     # Get related data
-    medical_history = MedicalHistory.objects.filter(
+    medical_history = MedicalVisit.objects.filter(
         patient=request.user
     ).order_by('-updated_at')[:5]
     
