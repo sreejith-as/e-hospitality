@@ -55,7 +55,7 @@ class Appointment(models.Model):
         return f"Appointment: {self.patient.get_full_name()} with Dr. {self.doctor.get_full_name()} on {self.schedule.date} at {self.schedule.start_time}"
 
 
-class MedicalVisit(models.Model):  # Better name than MedicalHistory
+class MedicalVisit(models.Model):
     patient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

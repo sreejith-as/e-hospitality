@@ -2,8 +2,8 @@
 {% load static %}
 
 {% block content %}
-<div class="d-flex" role="tabpanel" style="min-height: 100vh;">
-  <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa; max-height: calc(100vh - 100px); overflow-y: auto;" role="tablist" aria-orientation="vertical">
+<div class="d-flex" role="tabpanel" style="min-height: calc(100vh - 200px);">
+  <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa; max-height: calc(100vh - 200px); overflow-y: auto;" role="tablist" aria-orientation="vertical">
     <a class="nav-link mb-2 py-2 px-3 rounded active" id="overview-tab" data-bs-toggle="pill" href="#overview" role="tab" aria-controls="overview" aria-selected="true" style="font-weight: 600; font-size: 1.1rem;">
       <i class="bi bi-house-fill me-2"></i> Overview
     </a>
@@ -23,7 +23,8 @@
       <i class="bi bi-book-fill me-2"></i> Education
     </a>
   </nav>
-  <div class="tab-content flex-grow-1 p-3 border rounded bg-white">
+  <div class="tab-content flex-grow-1 p-3 border rounded bg-white" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+    <!-- Overview Tab -->
     <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
       <div class="row g-3 mb-4">
         <div class="col">
@@ -68,6 +69,7 @@
         {% endif %}
       </div>
     </div>
+    <!-- Appointments Tab -->
     <div class="tab-pane fade" id="appointments" role="tabpanel" aria-labelledby="appointments-tab">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>Appointments</h3>
@@ -311,6 +313,7 @@
         <div class="alert alert-info">No bills yet.</div>
       {% endif %}
     </div>
+    <!-- Education Tab -->
     <div class="tab-pane fade" id="education" role="tabpanel" aria-labelledby="education-tab">
       <h3>Health Education</h3>
       <div class="row row-cols-1 row-cols-md-3 g-3 mt-3">
@@ -342,6 +345,25 @@
     {% if message.tags == 'success' %}
       <script>
         document.addEventListener('DOMContentLoaded', function () {
+          // Get the hash from URL (e.g., #medical-records)
+          const hash = window.location.hash;
+
+          // If there's a hash and it matches a tab, show that tab
+          if (hash) {
+            const triggerEl = document.querySelector(`a[href="${hash}"]`);
+            if (triggerEl) {
+              bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+            }
+          }
+
+          // Optional: Update URL hash when user clicks a tab
+          const triggerArray = document.querySelectorAll('[data-bs-toggle="pill"]');
+          triggerArray.forEach(triggerEl => {
+            triggerEl.addEventListener('shown.bs.tab', function (event) {
+              window.location.hash = event.target.getAttribute('href');
+            });
+          });
+
           // Create toast element dynamically (or use existing one in base.html)
           const toastEl = document.createElement('div');
           toastEl.className = 'toast';

@@ -4,9 +4,10 @@
 <div class="container-fluid">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Appointment History</h2>
-    <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">
-      <i class="bi bi-plus-circle me-2"></i>Book New Appointment
-    </a>
+    <div>
+      <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book New Appointment</a>
+      <a href="{% url 'patients:dashboard' %}" class="btn btn-secondary">Go Back</a>
+    </div>
   </div>
 
   <!-- Upcoming Appointments Section -->
@@ -17,7 +18,7 @@
       </h5>
     </div>
     <div class="card-body">
-      {% if upcoming_appointments %}
+      {% if upcoming_page.object_list %}
         <div class="table-responsive">
           <table class="table table-hover">
             <thead>
@@ -31,7 +32,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for appointment in upcoming_appointments %}
+              {% for appointment in upcoming_page %}
               <tr>
                 <td>
                   <strong>Dr. {{ appointment.doctor.get_full_name }}</strong>
@@ -42,32 +43,49 @@
                 <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
                 <td>{{ appointment.symptoms|default:"Not specified"|truncatechars:50 }}</td>
                 <td>
-                  {% if appointment.status == 'booked' %}
-                    <span class="badge bg-primary">Scheduled</span>
-                  {% elif appointment.status == 'completed' %}
-                    <span class="badge bg-success">Completed</span>
-                  {% elif appointment.status == 'cancelled' %}
-                    <span class="badge bg-danger">Cancelled</span>
-                  {% endif %}
+                  <span class="badge bg-primary">Scheduled</span>
                 </td>
                 <td>
                   {% if appointment.status == 'booked' %}
-                    <div class="btn-group" role="group">
-                      <a href="{% url 'patients:edit_appointment' appointment.id %}" class="btn btn-sm btn-outline-primary" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
-                      <a href="{% url 'patients:cancel_appointment' appointment.id %}" class="btn btn-sm btn-outline-danger" title="Cancel">
-                        <i class="bi bi-x-circle"></i>
-                      </a>
-                    </div>
-                  {% else %}
-                    <span class="text-muted">No actions</span>
+                      <a href="{% url 'patients:edit_appointment' appointment.id %}" class="btn btn-sm btn-primary">Edit</a>
+                      <a href="{% url 'patients:cancel_appointment' appointment.id %}" class="btn btn-sm btn-danger">Cancel</a>
                   {% endif %}
                 </td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination for Upcoming -->
+        <div class="d-flex justify-content-center mt-3">
+          <nav aria-label="Upcoming appointments pagination">
+            <ul class="pagination pagination-sm">
+              {% if upcoming_page.has_previous %}
+                <li class="page-item">
+                  <a class="page-link" href="?page_upcoming={{ upcoming_page.previous_page_number }}">&laquo; Previous</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">&laquo; Previous</span>
+                </li>
+              {% endif %}
+
+              <li class="page-item disabled">
+                <span class="page-link">Page {{ upcoming_page.number }} of {{ upcoming_page.paginator.num_pages }}</span>
+              </li>
+
+              {% if upcoming_page.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="?page_upcoming={{ upcoming_page.next_page_number }}">Next &raquo;</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">Next &raquo;</span>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
         </div>
       {% else %}
         <div class="text-center py-4">
@@ -87,7 +105,7 @@
       </h5>
     </div>
     <div class="card-body">
-      {% if past_appointments %}
+      {% if past_page.object_list %}
         <div class="table-responsive">
           <table class="table table-hover">
             <thead>
@@ -101,7 +119,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for appointment in past_appointments %}
+              {% for appointment in past_page %}
               <tr>
                 <td>
                   <strong>Dr. {{ appointment.doctor.get_full_name }}</strong>
@@ -130,17 +148,36 @@
             </tbody>
           </table>
         </div>
-        
-        <!-- Pagination Info -->
-        <div class="d-flex justify-content-between align-items-center mt-3">
-          <small class="text-muted">
-            Showing {{ past_appointments|length }} past appointment{{ past_appointments|length|pluralize }}
-          </small>
-          <div>
-            <button class="btn btn-sm btn-outline-secondary" disabled>
-              <i class="bi bi-download me-1"></i>Export PDF
-            </button>
-          </div>
+
+        <!-- Pagination for Past -->
+        <div class="d-flex justify-content-center mt-3">
+          <nav aria-label="Past appointments pagination">
+            <ul class="pagination pagination-sm">
+              {% if past_page.has_previous %}
+                <li class="page-item">
+                  <a class="page-link" href="?page_past={{ past_page.previous_page_number }}">&laquo; Previous</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">&laquo; Previous</span>
+                </li>
+              {% endif %}
+
+              <li class="page-item disabled">
+                <span class="page-link">Page {{ past_page.number }} of {{ past_page.paginator.num_pages }}</span>
+              </li>
+
+              {% if past_page.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="?page_past={{ past_page.next_page_number }}">Next &raquo;</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">Next &raquo;</span>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
         </div>
       {% else %}
         <div class="text-center py-4">
@@ -157,7 +194,7 @@
     <div class="col-md-3">
       <div class="card text-center">
         <div class="card-body">
-          <h5 class="card-title">{{ upcoming_appointments|length }}</h5>
+          <h5 class="card-title">{{ upcoming_page.paginator.count }}</h5>
           <p class="card-text text-muted">Upcoming</p>
         </div>
       </div>
@@ -165,7 +202,7 @@
     <div class="col-md-3">
       <div class="card text-center">
         <div class="card-body">
-          <h5 class="card-title">{{ past_appointments|length }}</h5>
+          <h5 class="card-title">{{ past_page.paginator.count }}</h5>
           <p class="card-text text-muted">Past</p>
         </div>
       </div>
@@ -173,7 +210,7 @@
     <div class="col-md-3">
       <div class="card text-center">
         <div class="card-body">
-          <h5 class="card-title">{{ past_appointments|length|add:upcoming_appointments|length }}</h5>
+          <h5 class="card-title">{{ total_appointments_count }}</h5>
           <p class="card-text text-muted">Total</p>
         </div>
       </div>
@@ -181,14 +218,7 @@
     <div class="col-md-3">
       <div class="card text-center">
         <div class="card-body">
-          <h5 class="card-title">
-            {% for appointment in past_appointments %}
-              {% if appointment.status == 'completed' %}
-                {% widthratio 1 1 1 as completed_count %}
-              {% endif %}
-            {% endfor %}
-            {{ completed_count|default:0 }}
-          </h5>
+          <h5 class="card-title">{{ completed_count }}</h5>
           <p class="card-text text-muted">Completed</p>
         </div>
       </div>

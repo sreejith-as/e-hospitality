@@ -17,7 +17,7 @@ from accounts.models import CustomUser
 from .forms import AppointmentBookingForm
 from django.db.models import Sum, Count
 import json
-
+from django.core.paginator import Paginator
 from django.http import HttpResponse
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -37,40 +37,60 @@ def overview(request):
     user = request.user
     today = timezone.now().date()
 
-    # Upcoming Appointments
+    # 1. Upcoming Appointments
     upcoming_appointments = Appointment.objects.filter(
         patient=user,
         schedule__date__gte=today,
         status='booked'
     ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
 
-    # Medical Visits (Diagnosis & Notes)
-    medical_visits = MedicalVisit.objects.filter(patient=user).select_related('doctor').order_by('-created_at')
+    # 2. Medical Visits (for records count)
+    medical_visits = MedicalVisit.objects.filter(patient=user)
+    medical_records_count = medical_visits.count()  # ✅ Count all visits
 
-    # All Prescriptions (Past + Active)
-    all_prescriptions = Prescription.objects.filter(patient=user).select_related('medication', 'doctor').order_by('-created_at')
+    # 3. Active Prescriptions
+    # You can define "active" as: recently created, or not expired
+    # For now, let's say: prescriptions from the last 6 months
+    six_months_ago = today - timezone.timedelta(days=180)
+    active_prescriptions = Prescription.objects.filter(
+        patient=user,
+        created_at__gte=six_months_ago
+    ).select_related('medication', 'doctor')
 
-    # All Bills (Paid + Unpaid)
-    all_bills = Billing.objects.filter(patient=user).select_related('appointment__doctor').order_by('-created_at')
+    # 4. Unpaid Bills
+    unpaid_bills = Billing.objects.filter(
+        patient=user,
+        is_paid=False
+    )
 
-    # Pagination
-    from django.core.paginator import Paginator
-
+    # Pagination for tabs
     def paginate(qs, per_page=10):
         paginator = Paginator(qs, per_page)
-        page_number = request.GET.get(f'page_{qs.model.__name__.lower()}')
+        page_key = f'page_{qs.model.__name__.lower()}'
+        page_number = request.GET.get(page_key)
         return paginator.get_page(page_number)
 
     visits_page = paginate(medical_visits)
-    prescriptions_page = paginate(all_prescriptions)
-    bills_page = paginate(all_bills)
+    prescriptions_page = paginate(active_prescriptions)
+    bills_page = paginate(unpaid_bills)
 
+    # ✅ Build context with correct variable names
     context = {
+        # For cards
         'upcoming_appointments': upcoming_appointments,
+        'medical_records_count': medical_records_count,
+        'active_prescriptions': active_prescriptions,      # ← List (for |length)
+        'unpaid_bills': unpaid_bills,                      # ← List (for |length)
+
+        # For tabs
         'visits_page': visits_page,
         'prescriptions_page': prescriptions_page,
         'bills_page': bills_page,
+
+        # Optional: for recent activity
+        'recent_activity': []  # We'll populate below if needed
     }
+
     return render(request, 'patients/dashboard.html', context)
 
 # -----------------------------
@@ -82,24 +102,40 @@ def appointments(request):
     user = request.user
     today = timezone.now().date()
 
-    # Upcoming Appointments: booked and future/present (but not completed)
-    upcoming = Appointment.objects.filter(
+    # Upcoming Appointments (not cancelled)
+    upcoming_appointments = Appointment.objects.filter(
         patient=user,
-        status='booked',
-        schedule__date__gte=today
+        schedule__date__gte=today,
+        status='booked'
     ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
 
-    # Past Appointments: only those with status = 'completed'
-    # (Assuming completed appointments are only for past or today's visits)
+    # Past Appointments (completed or cancelled, in the past)
     past_appointments = Appointment.objects.filter(
         patient=user,
-        status='completed'
+        schedule__date__lt=today
     ).select_related('doctor', 'schedule').order_by('-schedule__date', '-schedule__start_time')
 
+    # Paginate Upcoming (10 per page)
+    paginator_upcoming = Paginator(upcoming_appointments, 6)
+    page_upcoming = request.GET.get('page_upcoming')
+    upcoming_page = paginator_upcoming.get_page(page_upcoming)
+
+    # Paginate Past (10 per page)
+    paginator_past = Paginator(past_appointments, 6)
+    page_past = request.GET.get('page_past')
+    past_page = paginator_past.get_page(page_past)
+
+    # Summary counts
+    completed_count = past_appointments.filter(status='completed').count()
+    total_appointments_count = upcoming_page.paginator.count + past_page.paginator.count
+
     context = {
-        'upcoming_appointments': upcoming,
-        'past_appointments': past_appointments,
+        'upcoming_page': upcoming_page,
+        'past_page': past_page,
+        'completed_count': completed_count,
+        'total_appointments_count': total_appointments_count,
     }
+
     return render(request, 'patients/appointments.html', context)
 
 
@@ -602,7 +638,7 @@ def book_appointment_form(request):
             )
 
             messages.success(request, f'Appointment with Dr. {doctor.get_full_name()} booked successfully!')
-            return redirect('patients:overview')
+            return redirect('patients:appointments')
         else:
             for field, errors in form.errors.items():
                 for error in errors:
@@ -683,7 +719,7 @@ def edit_appointment(request, appointment_id):
             appointment.save()
 
             messages.success(request, f'Appointment with Dr. {doctor.get_full_name()} updated successfully!')
-            return redirect('/patients/overview/#appointments')
+            return redirect('/patients/appointments')
         else:
             # Handle form errors
             for field, errors in form.errors.items():

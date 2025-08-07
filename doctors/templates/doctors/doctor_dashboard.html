@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<div class="d-flex" role="tabpanel" style="min-height: 100vh;">
+<div class="d-flex" role="tabpanel" style="min-height: calc(100vh - 200px);">
   <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa; max-height: calc(100vh - 100px); overflow-y: auto;" role="tablist" aria-orientation="vertical">
     <a class="nav-link mb-2 py-2 px-3 rounded active" id="appointments-tab" data-bs-toggle="pill" href="#appointments" role="tab" aria-controls="appointments" aria-selected="true" style="font-weight: 600; font-size: 1.1rem;">
       <i class="bi bi-calendar-check-fill me-2"></i> Appointments

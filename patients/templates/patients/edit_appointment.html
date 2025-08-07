@@ -1,122 +1,158 @@
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
-<div class="container py-4">
+<div class="container py-3, 5" >
   <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
 
       <!-- Page Title -->
-      <h2 class="mb-4">
-        <i class="bi bi-calendar-check"></i> Edit Appointment
-      </h2>
+      <div class="d-flex align-items-center mb-4">
+        <i class="bi bi-calendar-check text-primary me-2" style="font-size: 1.75rem;"></i>
+        <h2 class="mb-0 text-primary">Edit Appointment</h2>
+      </div>
 
       <!-- Current Appointment Card -->
-      <div class="card mb-4">
+      <div class="card shadow-sm border rounded mb-4">
+        <div class="card-header bg-light">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-info-circle text-info me-1"></i>
+            Current Appointment Details
+          </h5>
+        </div>
         <div class="card-body">
-          <h5 class="card-title">Current Appointment Details</h5>
-          <dl class="row mb-0">
-            <dt class="col-sm-3">Doctor</dt>
-            <dd class="col-sm-9">{{ appointment.doctor.get_full_name }}</dd>
-
-            <dt class="col-sm-3">Date</dt>
-            <dd class="col-sm-9">{{ appointment.schedule.date|date:"M d, Y" }}</dd>
-
-            <dt class="col-sm-3">Time</dt>
-            <dd class="col-sm-9">{{ appointment.schedule.start_time|time:"h:i A" }}</dd>
-
-            <dt class="col-sm-3">Reason</dt>
-            <dd class="col-sm-9">{{ appointment.symptoms|default:"N/A" }}</dd>
-
-            <dt class="col-sm-3">Status</dt>
-            <dd class="col-sm-9">
-              {% if appointment.status == 'booked' %}
-                <span class="badge bg-primary">Scheduled</span>
-              {% elif appointment.status == 'completed' %}
-                <span class="badge bg-success">Completed</span>
-              {% elif appointment.status == 'cancelled' %}
-                <span class="badge bg-danger">Cancelled</span>
-              {% else %}
-                <span class="badge bg-secondary">{{ appointment.status|title }}</span>
-              {% endif %}
-            </dd>
-          </dl>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="d-flex">
+                <strong class="text-muted me-2" style="min-width: 80px;">Doctor:</strong>
+                <span>Dr. {{ appointment.doctor.get_full_name }}</span>
+              </div>
+              <div class="d-flex">
+                <strong class="text-muted me-2" style="min-width: 80px;">Date:</strong>
+                <span>{{ appointment.schedule.date|date:"M d, Y" }}</span>
+              </div>
+              <div class="d-flex">
+                <strong class="text-muted me-2" style="min-width: 80px;">Time:</strong>
+                <span>{{ appointment.schedule.start_time|time:"h:i A" }}</span>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="d-flex flex-column">
+                <div class="mb-1">
+                  <strong class="text-muted">Reason:</strong>
+                  <span class="ms-1">{{ appointment.symptoms|default:"N/A" }}</span>
+                </div>
+                <div>
+                  <strong class="text-muted">Status:</strong>
+                  <span class="ms-1">
+                    {% if appointment.status == 'booked' %}
+                      <span class="badge bg-primary">Scheduled</span>
+                    {% elif appointment.status == 'completed' %}
+                      <span class="badge bg-success">Completed</span>
+                    {% elif appointment.status == 'cancelled' %}
+                      <span class="badge bg-danger">Cancelled</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ appointment.status|title }}</span>
+                    {% endif %}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Error Display: Non-Field Errors -->
+      <!-- Error Messages -->
       {% if form.non_field_errors %}
         <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>
           {% for error in form.non_field_errors %}
-            <div>{{ error }}</div>
+            <div><strong>Error:</strong> {{ error }}</div>
           {% endfor %}
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
       {% endif %}
 
-      <!-- Form -->
-      <form method="post" id="booking-form">
+      <!-- Edit Form -->
+      <form method="post" id="booking-form" class="shadow-sm p-4 border rounded">
         {% csrf_token %}
 
-        <!-- Department -->
-        <div class="mb-3">
-          {{ form.department.label_tag }}
-          {{ form.department }}
-          {% if form.department.errors %}
-            <div class="text-danger small mt-1">{{ form.department.errors.0 }}</div>
-          {% endif %}
+        <div class="row g-3">
+          <!-- Department -->
+          <div class="col-md-6">
+            <label for="{{ form.department.id_for_label }}" class="form-label fw-semibold">
+              <i class="bi bi-building text-primary me-1"></i>
+              {{ form.department.label }}
+            </label>
+            {{ form.department }}
+            {% if form.department.errors %}
+              <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle"></i> {{ form.department.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Doctor -->
+          <div class="col-md-6">
+            <label for="{{ form.doctor.id_for_label }}" class="form-label fw-semibold">
+              <i class="bi bi-person-badge text-primary me-1"></i>
+              {{ form.doctor.label }}
+            </label>
+            {{ form.doctor }}
+            {% if form.doctor.errors %}
+              <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle"></i> {{ form.doctor.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Date -->
+          <div class="col-md-6">
+            <label for="{{ form.date.id_for_label }}" class="form-label fw-semibold">
+              <i class="bi bi-calendar-event text-success me-1"></i>
+              {{ form.date.label }}
+            </label>
+            {{ form.date }}
+            {% if form.date.errors %}
+              <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle"></i> {{ form.date.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Time -->
+          <div class="col-md-6">
+            <label for="{{ form.time.id_for_label }}" class="form-label fw-semibold">
+              <i class="bi bi-clock text-success me-1"></i>
+              {{ form.time.label }}
+            </label>
+            {{ form.time }}
+            {% if form.time.errors %}
+              <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle"></i> {{ form.time.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Symptoms -->
+          <div class="col-12">
+            <label for="{{ form.symptoms.id_for_label }}" class="form-label fw-semibold">
+              <i class="bi bi-clipboard-pulse text-danger me-1"></i>
+              {{ form.symptoms.label }}
+            </label>
+            {{ form.symptoms }}
+            {% if form.symptoms.errors %}
+              <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle"></i> {{ form.symptoms.errors.0 }}</div>
+            {% endif %}
+          </div>
         </div>
 
-        <!-- Doctor -->
-        <div class="mb-3">
-          {{ form.doctor.label_tag }}
-          {{ form.doctor }}
-          {% if form.doctor.errors %}
-            <div class="text-danger small mt-1">{{ form.doctor.errors.0 }}</div>
-          {% endif %}
-        </div>
-
-        <!-- Date -->
-        <div class="mb-3">
-          {{ form.date.label_tag }}
-          {{ form.date }}
-          {% if form.date.errors %}
-            <div class="text-danger small mt-1">{{ form.date.errors.0 }}</div>
-          {% endif %}
-        </div>
-
-        <!-- Time -->
-        <div class="mb-3">
-          {{ form.time.label_tag }}
-          {{ form.time }}
-          {% if form.time.errors %}
-            <div class="text-danger small mt-1">{{ form.time.errors.0 }}</div>
-          {% endif %}
-        </div>
-
-        <!-- Symptoms -->
-        <div class="mb-3">
-          {{ form.symptoms.label_tag }}
-          {{ form.symptoms }}
-          {% if form.symptoms.errors %}
-            <div class="text-danger small mt-1">{{ form.symptoms.errors.0 }}</div>
-          {% endif %}
-        </div>
-
-        <!-- Buttons -->
-        <div class="d-flex gap-2">
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-save"></i> Update Appointment
-          </button>
-          <a href="{% url 'patients:appointments' %}" class="btn btn-secondary">
-            <i class="bi bi-x-circle"></i> Cancel
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-end gap-2 mt-4">
+          <a href="{% url 'patients:appointments' %}" class="btn btn-outline-secondary px-4">
+            <i class="bi bi-x-circle me-1"></i> Cancel
           </a>
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-save me-1"></i> Update Appointment
+          </button>
         </div>
       </form>
     </div>
   </div>
 </div>
 
-<!-- Dynamic Loading Script -->
+<!-- Dynamic Loading Script (Improved) -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const deptSelect = document.getElementById('id_department');
@@ -124,11 +160,16 @@ document.addEventListener('DOMContentLoaded', function () {
   const dateInput = document.getElementById('id_date');
   const timeSelect = document.getElementById('id_time');
 
+  // Show loading state
+  function setLoading(selectEl, message) {
+    selectEl.innerHTML = `<option value="">${message}</option>`;
+  }
+
   // Load doctors when department changes
   deptSelect.addEventListener('change', function () {
     const deptId = this.value;
-    doctorSelect.innerHTML = '<option value="">Loading...</option>';
-    timeSelect.innerHTML = '<option value="">Select date to load time slots</option>';
+    setLoading(doctorSelect, 'Loading...');
+    setLoading(timeSelect, 'Select date to load slots');
 
     if (!deptId) {
       doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
@@ -143,24 +184,27 @@ document.addEventListener('DOMContentLoaded', function () {
           const option = document.createElement('option');
           option.value = d.id;
           option.textContent = d.name;
+          if (d.id == "{{ appointment.doctor.id }}") option.selected = true;
           doctorSelect.appendChild(option);
         });
+        // Trigger time slot update if date is already selected
+        if (dateInput.value) updateTimeSlots();
       })
       .catch(() => {
         doctorSelect.innerHTML = '<option value="">Error loading doctors</option>';
       });
   });
 
-  // Load available time slots when doctor or date changes
+  // Load available time slots
   function updateTimeSlots() {
     const doctorId = doctorSelect.value;
     const date = dateInput.value;
     if (!doctorId || !date) {
-      timeSelect.innerHTML = '<option value="">Select doctor and date</option>';
+      setLoading(timeSelect, 'Select doctor and date');
       return;
     }
 
-    timeSelect.innerHTML = '<option value="">Loading...</option>';
+    setLoading(timeSelect, 'Loading...');
     fetch(`{% url 'patients:get_available_time_slots' %}?doctor_id=${doctorId}&date=${date}`)
       .then(response => response.json())
       .then(data => {
@@ -176,6 +220,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const option = document.createElement('option');
             option.value = slot;
             option.textContent = slot;
+            if (slot === "{{ appointment.schedule.start_time|time:'H:i' }}") {
+              option.selected = true;
+            }
             timeSelect.appendChild(option);
           });
         }
@@ -187,7 +234,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
   doctorSelect.addEventListener('change', updateTimeSlots);
   dateInput.addEventListener('change', updateTimeSlots);
+
+  // Pre-fill on load
+  window.addEventListener('load', () => {
+    if (deptSelect.value && !doctorSelect.value) {
+      deptSelect.dispatchEvent(new Event('change'));
+    }
+  });
 });
 </script>
 
+<!-- Optional: Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 {% endblock %}
