@@ -1,21 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Pay Bill - E-Hospitality</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-<div class="container mt-5">
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
     <h3>Pay Bill</h3>
-    <p><strong>Description:</strong> {{ billing.description }}</p>
-    <p><strong>Amount:</strong> {{ billing.amount }}</p>
-    <p><strong>Due Date:</strong> {{ billing.due_date }}</p>
-    <form method="post">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary">Confirm Payment</button>
-        <a href="{% url 'patients:view_billing' %}" class="btn btn-secondary">Cancel</a>
-    </form>
+    <div class="card">
+        <div class="card-body">
+        <p><strong>Amount:</strong> ₹{{ billing.amount }}</p>
+        <p><strong>Description:</strong> {{ billing.description }}</p>
+        <p><strong>Status:</strong> {% if billing.is_paid %}<span class="badge bg-success">Paid</span>{% else %}<span class="badge bg-warning">Unpaid</span>{% endif %}</p>
+
+        <form action="" method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">Pay with Stripe</button>
+        </form>
+        </div>
+    </div>
 </div>
-</body>
-</html>
+{% endblock %}

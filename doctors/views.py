@@ -1,4 +1,5 @@
 # doctors/views.py
+from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -108,6 +109,7 @@ def todays_appointments(request):
         'appointments': appointments,
         'search_query': request.GET.get('search', ''),
         'all_medicines': all_medicines,
+        'CONSULTATION_FEE': settings.CONSULTATION_FEE,
     })
 
 # -----------------------------
@@ -258,25 +260,8 @@ def prescribe_for_appointment(request, appointment_id):
     appointment = get_object_or_404(Appointment, id=appointment_id, doctor=request.user)
 
     if request.method == 'POST':
-        # Get diagnosis from form
-        diagnosis = request.POST.get('diagnosis')
-        if not diagnosis:
-            messages.error(request, "Diagnosis is required.")
-            return redirect('doctors:todays_appointments')
-
-        # Save Medical Visit
-        MedicalVisit.objects.create(
-            patient=appointment.patient,
-            doctor=request.user,
-            appointment=appointment,
-            diagnosis=diagnosis,
-            symptoms=appointment.symptoms,
-            notes="Prescribed via appointment"
-        )
-
-        # Process medicines...
         i = 0
-        total_amount = 0
+        total_medicine_cost = 0
         prescriptions_created = 0
 
         while True:
@@ -306,7 +291,7 @@ def prescribe_for_appointment(request, appointment_id):
                     instructions=instructions,
                     line_total=line_total
                 )
-                total_amount += line_total
+                total_medicine_cost += line_total
                 prescriptions_created += 1
 
             except (Medication.DoesNotExist, ValueError):
@@ -314,21 +299,36 @@ def prescribe_for_appointment(request, appointment_id):
             i += 1
 
         if prescriptions_created > 0:
+            # Mark as completed
             if appointment.status == 'booked':
                 appointment.status = 'completed'
                 appointment.save()
 
+            # ✅ Consultation Fee
+            consultation_fee = settings.CONSULTATION_FEE
+            total_amount = total_medicine_cost + consultation_fee
+
+            # ✅ Create Bill with detailed description
             Billing.objects.create(
                 patient=appointment.patient,
                 amount=total_amount,
-                description=f"Prescription for {prescriptions_created} medicine(s)",
+                description=f"Consultation Fee (₹{consultation_fee}) + {prescriptions_created} Medicine(s) (₹{total_medicine_cost})",
                 is_paid=False,
                 due_date=timezone.now().date(),
                 appointment=appointment
             )
-            messages.success(request, f"Diagnosis and prescription saved. Total: ₹{total_amount:.2f}")
+            messages.success(request, f"Prescription saved. Total: ₹{total_amount:.2f}")
         else:
-            messages.error(request, "No valid prescriptions to save.")
+            # Even if no medicine, charge consultation fee
+            Billing.objects.create(
+                patient=appointment.patient,
+                amount=settings.CONSULTATION_FEE,
+                description="Consultation Fee only",
+                is_paid=False,
+                due_date=timezone.now().date(),
+                appointment=appointment
+            )
+            messages.warning(request, "No medicines prescribed, but consultation fee applied.")
 
         return redirect('doctors:todays_appointments')
 
