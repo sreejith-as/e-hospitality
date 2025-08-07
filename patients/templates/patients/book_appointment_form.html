@@ -1,55 +1,130 @@
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
-<div class="container py-4">
+<div class="container py-5">
   <div class="row justify-content-center">
-    <div class="col-lg-8">
-      <h2><i class="bi bi-calendar-plus"></i> Book Appointment</h2>
-      <form method="post" id="booking-form">
-        {% csrf_token %}
-        <div class="mb-3">
-          {{ form.department.label_tag }}
-          {{ form.department }}
+    <div class="col-lg-10">
+      <!-- Main Card -->
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="bi bi-calendar-plus me-2"></i>
+            Book an Appointment
+          </h4>
         </div>
+        <div class="card-body p-4">
+          <form method="post" id="booking-form">
+            {% csrf_token %}
 
-        <div class="mb-3">
-          {{ form.doctor.label_tag }}
-          {{ form.doctor }}
+            <!-- Department & Doctor Row -->
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="{{ form.department.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-building me-1 text-primary"></i>
+                  {{ form.department.label }}
+                </label>
+                {{ form.department }}
+                <div class="form-text text-muted">Choose a department to see available doctors.</div>
+              </div>
+
+              <div class="col-md-6">
+                <label for="{{ form.doctor.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-person-badge me-1 text-primary"></i>
+                  {{ form.doctor.label }}
+                </label>
+                {{ form.doctor }}
+                <div class="invalid-feedback">Please select a doctor.</div>
+              </div>
+            </div>
+
+            <!-- Working Schedule Panel -->
+            <div class="alert alert-light border-info d-none mb-4" id="schedule-panel">
+              <h6 class="mb-3 text-info">
+                <i class="bi bi-clock-history me-1"></i>
+                Doctor's Working Schedule
+              </h6>
+              <div id="schedule-list" class="row g-2"></div>
+              <p class="text-muted mt-2 mb-0" id="no-schedule-message" style="display: none;">
+                <i class="bi bi-exclamation-triangle"></i>
+                This doctor has no working hours defined.
+              </p>
+            </div>
+
+            <!-- Date & Time Row -->
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="{{ form.date.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-calendar-event me-1 text-success"></i>
+                  {{ form.date.label }}
+                </label>
+                {{ form.date }}
+                <div class="form-text">Select a date to view available time slots.</div>
+              </div>
+
+              <div class="col-md-6">
+                <label for="{{ form.time.id_for_label }}" class="form-label fw-semibold">
+                  <i class="bi bi-clock me-1 text-success"></i>
+                  {{ form.time.label }}
+                </label>
+                {{ form.time }}
+                <div class="form-text text-muted" id="time-status">Select doctor and date to load slots.</div>
+              </div>
+            </div>
+
+            <!-- Symptoms -->
+            <div class="mb-4">
+              <label for="{{ form.symptoms.id_for_label }}" class="form-label fw-semibold">
+                <i class="bi bi-clipboard-pulse me-1 text-danger"></i>
+                {{ form.symptoms.label }}
+              </label>
+              {{ form.symptoms }}
+              <div class="form-text">Briefly describe your symptoms or reason for visit.</div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2">
+              <a href="{% url 'patients:overview' %}" class="btn btn-outline-secondary px-4">
+                <i class="bi bi-x-circle me-1"></i> Cancel
+              </a>
+              <button type="submit" class="btn btn-primary px-4">
+                <i class="bi bi-check-circle me-1"></i> Book Appointment
+              </button>
+            </div>
+          </form>
         </div>
-
-        <div class="mb-3">
-          {{ form.date.label_tag }}
-          {{ form.date }}
-        </div>
-
-        <div class="mb-3">
-          {{ form.time.label_tag }}
-          {{ form.time }}
-        </div>
-
-        <div class="mb-3">
-          {{ form.symptoms.label_tag }}
-          {{ form.symptoms }}
-        </div>
-
-        <button type="submit" class="btn btn-primary">Book Appointment</button>
-        <a href="{% url 'patients:overview' %}" class="btn btn-secondary">Cancel</a>
-      </form>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- Enhanced JavaScript -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const deptSelect = document.getElementById('id_department');
   const doctorSelect = document.getElementById('id_doctor');
   const dateInput = document.getElementById('id_date');
   const timeSelect = document.getElementById('id_time');
+  const schedulePanel = document.getElementById('schedule-panel');
+  const scheduleList = document.getElementById('schedule-list');
+  const timeStatus = document.getElementById('time-status');
+  const noScheduleMessage = document.getElementById('no-schedule-message');
 
+  // Hide schedule panel initially
+  function hideSchedule() {
+    schedulePanel.classList.add('d-none');
+    scheduleList.innerHTML = '';
+    noScheduleMessage.style.display = 'none';
+  }
+
+  hideSchedule();
+
+  // Load doctors when department changes
   deptSelect.addEventListener('change', function () {
     const deptId = this.value;
+    hideSchedule();
     doctorSelect.innerHTML = '<option value="">Loading...</option>';
     timeSelect.innerHTML = '<option value="">Select date to load time slots</option>';
+    timeStatus.textContent = 'Select date to load time slots.';
 
     if (!deptId) {
       doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
@@ -66,18 +141,62 @@ document.addEventListener('DOMContentLoaded', function () {
           option.textContent = d.name;
           doctorSelect.appendChild(option);
         });
+      })
+      .catch(() => {
+        doctorSelect.innerHTML = '<option value="">Error loading doctors</option>';
       });
   });
 
+  // Load doctor schedule when doctor changes
+  doctorSelect.addEventListener('change', function () {
+    const doctorId = this.value;
+    hideSchedule();
+
+    if (!doctorId) return;
+
+    fetch(`{% url 'patients:get_doctor_schedule' %}?doctor_id=${doctorId}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.working_hours.length > 0) {
+          scheduleList.innerHTML = '';
+          data.working_hours.forEach(slot => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6';
+            col.innerHTML = `
+              <div class="bg-white border rounded p-2 text-center">
+                <small class="text-secondary d-block">${slot.day}</small>
+                <strong class="text-dark">${slot.start_time} – ${slot.end_time}</strong>
+              </div>
+            `;
+            scheduleList.appendChild(col);
+          });
+          schedulePanel.classList.remove('d-none');
+        } else {
+          noScheduleMessage.style.display = 'block';
+          schedulePanel.classList.remove('d-none');
+        }
+      })
+      .catch(err => {
+        console.error("Error loading schedule:", err);
+        noScheduleMessage.textContent = "Failed to load working hours.";
+        noScheduleMessage.style.display = 'block';
+        schedulePanel.classList.remove('d-none');
+      });
+  });
+
+  // Update time slots when doctor or date changes
   function updateTimeSlots() {
     const doctorId = doctorSelect.value;
     const date = dateInput.value;
     if (!doctorId || !date) {
-      timeSelect.innerHTML = '<option value="">Select date and doctor</option>';
+      timeSelect.innerHTML = '<option value="">Select doctor and date</option>';
+      timeStatus.textContent = 'Select doctor and date to load time slots.';
       return;
     }
 
     timeSelect.innerHTML = '<option value="">Loading...</option>';
+    timeStatus.textContent = 'Loading available time slots...';
+
     fetch(`{% url 'patients:get_available_time_slots' %}?doctor_id=${doctorId}&date=${date}`)
       .then(response => response.json())
       .then(data => {
@@ -88,6 +207,7 @@ document.addEventListener('DOMContentLoaded', function () {
           option.textContent = 'No slots available';
           option.disabled = true;
           timeSelect.appendChild(option);
+          timeStatus.textContent = 'No available slots for this date.';
         } else {
           data.available_slots.forEach(slot => {
             const option = document.createElement('option');
@@ -95,7 +215,12 @@ document.addEventListener('DOMContentLoaded', function () {
             option.textContent = slot;
             timeSelect.appendChild(option);
           });
+          timeStatus.textContent = 'Select a convenient time.';
         }
+      })
+      .catch(() => {
+        timeSelect.innerHTML = '<option value="">Error loading slots</option>';
+        timeStatus.textContent = 'Could not load time slots.';
       });
   }
 
@@ -103,4 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
   dateInput.addEventListener('change', updateTimeSlots);
 });
 </script>
+
+<!-- Optional: Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 {% endblock %}

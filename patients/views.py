@@ -625,29 +625,6 @@ def view_doctors_schedule(request):
     schedules = TimeSlot.objects.filter(doctor__in=doctors).order_by('date', 'start_time')
     return render(request, 'patients/doctor_schedule.html', {'schedules': schedules})
 
-
-# -----------------------------
-# Direct Booking by Schedule ID (Optional)
-# -----------------------------
-@login_required
-@role_required('patient')
-def book_appointment(request, schedule_id):
-    schedule = get_object_or_404(TimeSlot, id=schedule_id)
-    if request.method == 'POST':
-        if Appointment.objects.filter(patient=request.user, schedule=schedule, status='booked').exists():
-            messages.error(request, 'You have already booked this appointment.')
-        else:
-            Appointment.objects.create(
-                patient=request.user,
-                doctor=schedule.doctor,
-                schedule=schedule,
-                status='booked'
-            )
-            messages.success(request, 'Appointment booked successfully.')
-        return redirect('patients:appointments')
-    return render(request, 'patients/book_appointment.html', {'schedule': schedule})
-
-
 # -----------------------------
 # Cancel Appointment (Patient)
 # -----------------------------
@@ -909,3 +886,37 @@ def download_medical_history_pdf(request):
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+@require_GET
+@login_required
+@role_required('patient')
+def get_doctor_schedule(request):
+    doctor_id = request.GET.get('doctor_id')
+    if not doctor_id:
+        return JsonResponse({'success': False, 'working_hours': []})
+
+    try:
+        doctor = CustomUser.objects.get(id=doctor_id, role='doctor')
+    except CustomUser.DoesNotExist:
+        return JsonResponse({'success': False, 'working_hours': []})
+
+    availabilities = DoctorAvailability.objects.filter(doctor=doctor)
+
+    day_order = {
+        'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3,
+        'fri': 4, 'sat': 5, 'sun': 6
+    }
+
+    sorted_avail = sorted(availabilities, key=lambda x: day_order[x.day_of_week])
+
+    return JsonResponse({
+        'success': True,
+        'working_hours': [
+            {
+                'day': avail.get_day_of_week_display(),
+                'start_time': avail.start_time.strftime('%H:%M'),
+                'end_time': avail.end_time.strftime('%H:%M')
+            }
+            for avail in sorted_avail
+        ]
+    })

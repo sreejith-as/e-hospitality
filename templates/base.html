@@ -42,7 +42,18 @@
     </style>
 </head>
 <body>
-
+    <!-- Notification Toast Container -->
+    <div id="notification-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1100; pointer-events: none;">
+        <div id="notification-toast" class="toast hide" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+            <div class="toast-header">
+            <strong class="me-auto">Notification</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="notification-message">
+            <!-- Message will be inserted here dynamically -->
+            </div>
+        </div>
+    </div>
     <!-- Header -->
     <header class="bg-white border-bottom shadow-sm sticky-top">
         <div class="container d-flex justify-content-between align-items-center py-3">
@@ -75,17 +86,7 @@
         </div>
     </header>
 
-    <!-- Messages -->
-    {% if messages %}
-        <div class="container py-4">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
+
 
     <!-- Main Content -->
     <main>
@@ -105,5 +106,15 @@
     <!-- Bootstrap JS Bundle (includes Popper) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+    <script>
+        function showNotification(message) {
+            const toastEl = document.getElementById('notification-toast');
+            const toastBody = document.getElementById('notification-message');
+            const toast = bootstrap.Toast.getInstance(toastEl) || new bootstrap.Toast(toastEl);
+
+            toastBody.textContent = message;
+            toast.show();
+        }
+</script>
 </body>
 </html>

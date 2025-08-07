@@ -17,7 +17,6 @@ urlpatterns = [
     path('appointments/', views.appointments, name='appointments'),
     path('book-appointment-form/', views.book_appointment_form, name='book_appointment_form'),
     path('doctor-schedule/', views.view_doctors_schedule, name='view_doctors_schedule'),
-    path('book-appointment/<int:schedule_id>/', views.book_appointment, name='book_appointment'),
     path('cancel-appointment/<int:appointment_id>/', views.cancel_appointment, name='cancel_appointment'),
     path('edit-appointment/<int:appointment_id>/', views.edit_appointment, name='edit_appointment'),
 
@@ -36,6 +35,7 @@ urlpatterns = [
     # AJAX
     path('get_doctors_by_department/', views.get_doctors_by_department, name='get_doctors_by_department'),
     path('get_available_time_slots/', views.get_available_time_slots, name='get_available_time_slots'),
+    path('get_doctor_schedule/', views.get_doctor_schedule, name='get_doctor_schedule'),
 
     # Payment
     path('payment-success/', views.payment_success, name='payment_success'),

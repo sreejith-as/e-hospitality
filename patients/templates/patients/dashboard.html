@@ -336,4 +336,43 @@
     </div>
   </div>
 </div>
+
+{% if messages %}
+  {% for message in messages %}
+    {% if message.tags == 'success' %}
+      <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          // Create toast element dynamically (or use existing one in base.html)
+          const toastEl = document.createElement('div');
+          toastEl.className = 'toast';
+          toastEl.role = 'alert';
+          toastEl.innerHTML = `
+            <div class="toast-header bg-success text-white">
+              <strong class="me-auto">Success</strong>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+              {{ message|escapejs }}
+            </div>
+          `;
+
+          // Append to container
+          const container = document.getElementById('notification-container') || 
+                           document.body.appendChild(
+                             Object.assign(document.createElement('div'), {
+                               id: 'notification-container',
+                               className: 'position-fixed top-0 end-0 p-3',
+                               style: 'z-index: 1100; pointer-events: none;'
+                             })
+                           );
+
+          container.appendChild(toastEl);
+
+          // Show toast
+          new bootstrap.Toast(toastEl, { delay: 5000 }).show();
+        });
+      </script>
+    {% endif %}
+  {% endfor %}
+{% endif %}
 {% endblock %}
