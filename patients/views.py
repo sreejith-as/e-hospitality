@@ -610,15 +610,17 @@ def book_appointment_form(request):
         form = AppointmentBookingForm(request.POST)
         if form.is_valid():
             doctor = form.cleaned_data['doctor']
-            date = form.cleaned_data['date']
-            time_obj = form.cleaned_data['time']
+            date = form.cleaned_data['date']         # ✅ Selected date
+            time_obj = form.cleaned_data['time']     # ✅ Selected time
             symptoms = form.cleaned_data['symptoms']
 
-            # Get or create the TimeSlot
+            # Calculate end time
             end_time_obj = (datetime.combine(date, time_obj) + timedelta(minutes=30)).time()
+
+            # ✅ Get or create TimeSlot with correct date
             time_slot, created = TimeSlot.objects.get_or_create(
                 doctor=doctor,
-                date=date,
+                date=date,              # ✅ Not timezone.now().date()
                 start_time=time_obj,
                 defaults={'end_time': end_time_obj}
             )
@@ -643,8 +645,6 @@ def book_appointment_form(request):
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f"{field}: {error}")
-            for error in form.non_field_errors():
-                messages.error(request, error)
     else:
         form = AppointmentBookingForm()
 

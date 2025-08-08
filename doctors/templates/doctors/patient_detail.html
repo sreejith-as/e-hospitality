@@ -1,91 +1,141 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block content %}
-<div class="container mt-5">
-    <h3>Patient Detail: {{ patient.get_full_name }}</h3>
-    <p><strong>Age:</strong> {{ age|default:"N/A" }}</p>
-    <p><strong>Gender:</strong> {{ patient.get_gender_display|default:"N/A" }}</p>
-    <p><strong>Email:</strong> {{ patient.email }}</p>
-    <p><strong>Phone Number:</strong> {{ patient.phone_number|default:"N/A" }}</p>
+<div class="container py-3, 5">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
 
-    <h4>Appointments</h4>
-    <table class="table table-striped">
-        <thead>
-            <tr>
+      <!-- Page Title & Back Button -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary d-flex align-items-center">
+          <i class="bi bi-person-fill me-2"></i>
+          Patient Detail: {{ patient.get_full_name }}
+        </h2>
+        <a href="#" onclick="history.back();" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i> Back to Patients
+        </a>
+      </div>
+
+      <!-- Patient Info Card -->
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="d-flex mb-2">
+                <strong class="text-muted me-2" style="min-width: 80px;">Full Name:</strong>
+                <span>{{ patient.get_full_name }}</span>
+              </div>
+              <div class="d-flex mb-2">
+                <strong class="text-muted me-2" style="min-width: 80px;">Age:</strong>
+                <span>{{ age|default:"N/A" }}</span>
+              </div>
+              <div class="d-flex mb-2">
+                <strong class="text-muted me-2" style="min-width: 80px;">Gender:</strong>
+                <span>{{ patient.get_gender_display|default:"N/A" }}</span>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="d-flex mb-2">
+                <strong class="text-muted me-2" style="min-width: 80px;">Email:</strong>
+                <span>{{ patient.email }}</span>
+              </div>
+              <div class="d-flex mb-2">
+                <strong class="text-muted me-2" style="min-width: 80px;">Phone:</strong>
+                <span>{{ patient.phone_number|default:"N/A" }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Appointments Table -->
+      <h4 class="mb-3 text-primary">
+        <i class="bi bi-calendar-check me-1"></i>
+        Appointment History
+      </h4>
+
+      {% if appointments %}
+        <div class="table-responsive shadow-sm rounded border">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
                 <th>Date</th>
                 <th>Time</th>
                 <th>Doctor</th>
                 <th>Status</th>
                 <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for appointment in appointments %}
-            <tr>
-                <td>{{ appointment.schedule.date }}</td>
-                <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
-                <td>{{ appointment.doctor.get_full_name }}</td>
-                <td>
+              </tr>
+            </thead>
+            <tbody>
+              {% for appointment in appointments %}
+                <tr>
+                  <td>{{ appointment.schedule.date|date:"M d, Y" }}</td>
+                  <td>{{ appointment.schedule.start_time|time:"h:i A" }}</td>
+                  <td>Dr. {{ appointment.doctor.get_full_name }}</td>
+                  <td>
                     {% if appointment.status == 'booked' %}
-                        <span class="badge bg-primary">Scheduled</span>
+                      <span class="badge bg-primary">Scheduled</span>
                     {% elif appointment.status == 'completed' %}
-                        <span class="badge bg-success">Completed</span>
+                      <span class="badge bg-success">Completed</span>
                     {% elif appointment.status == 'cancelled' %}
-                        <span class="badge bg-danger">Cancelled</span>
+                      <span class="badge bg-danger">Cancelled</span>
                     {% else %}
-                        <span class="badge bg-secondary">{{ appointment.status }}</span>
+                      <span class="badge bg-secondary">{{ appointment.status|title }}</span>
                     {% endif %}
-                </td>
-                <td>
-                    <a href="{% url 'doctors:appointment_details' appointment.id %}" class="btn btn-primary btn-sm">View Details</a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5">No appointments found.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                  </td>
+                  <td>
+                    <a
+                      href="{% url 'doctors:appointment_details' appointment.id %}"
+                      class="btn btn-sm btn-outline-primary"
+                      title="View Details"
+                    >
+                      <i class="bi bi-eye"></i> View
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
 
-    <h4>Medical History</h4>
-    <ul>
-        {% for history in medical_history %}
-        <li>{{ history.details }}</li>
-        {% empty %}
-        <li>No medical history available.</li>
-        {% endfor %}
-    </ul>
-
-    <h4>Diagnosis Notes</h4>
-    <ul>
-        {% for note in diagnosis_notes %}
-        <li>{{ note.created_at|date:"Y-m-d" }}: {{ note.note }}</li>
-        {% empty %}
-        <li>No diagnosis notes available.</li>
-        {% endfor %}
-    </ul>
-    <a href="{% url 'doctors:add_diagnosis_note' patient.id %}" class="btn btn-primary mb-3">Add Diagnosis Note</a>
-
-    <h4>Treatments</h4>
-    <ul>
-        {% for treatment in treatments %}
-        <li>{{ treatment.created_at|date:"Y-m-d" }}: {{ treatment.treatment_details }}</li>
-        {% empty %}
-        <li>No treatments available.</li>
-        {% endfor %}
-    </ul>
-    <a href="{% url 'doctors:add_treatment' patient.id %}" class="btn btn-primary mb-3">Add Treatment</a>
-
-    <h4>Prescriptions</h4>
-    <ul>
-        {% for prescription in prescriptions %}
-        <li>{{ prescription.created_at|date:"Y-m-d" }}: {{ prescription.medication.name }} - {{ prescription.dosage }}</li>
-        {% empty %}
-        <li>No prescriptions available.</li>
-        {% endfor %}
-    </ul>
-    <a href="{% url 'doctors:add_prescription' patient.id %}" class="btn btn-primary mb-3">Add Prescription</a>
-
-    <a href="{% url 'doctors:patient_list' %}" class="btn btn-secondary">Back to Patient List</a>
+        <!-- Pagination -->
+        {% if appointments.has_other_pages %}
+          <div class="d-flex justify-content-center mt-4">
+            <nav>
+              <ul class="pagination pagination-sm mb-0">
+                {% if appointments.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page=1">&laquo; First</a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ appointments.previous_page_number }}">Previous</a>
+                  </li>
+                {% endif %}
+                <li class="page-item disabled">
+                  <span class="page-link">Page {{ appointments.number }} of {{ appointments.paginator.num_pages }}</span>
+                </li>
+                {% if appointments.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ appointments.next_page_number }}">Next</a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ appointments.paginator.num_pages }}">Last &raquo;</a>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="text-center py-4">
+          <i class="bi bi-calendar-x fs-1 text-muted"></i>
+          <p class="text-muted mt-2">No appointments found for this patient.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
 </div>
+
+<!-- Optional: Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 {% endblock %}
