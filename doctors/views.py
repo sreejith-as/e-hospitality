@@ -1,11 +1,10 @@
-# doctors/views.py
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
 from django.utils import timezone
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from accounts.utils import role_required
 from accounts.models import CustomUser 
 from .models import DiagnosisNote, Treatment, Medication, Prescription, DoctorAvailability
@@ -16,6 +15,7 @@ from django.http import HttpResponseRedirect, JsonResponse
 from .models import  Medication, Prescription
 from patients.models import Appointment, Billing, MedicalVisit
 from django.db.models import Q, Case, When, Value, IntegerField
+import logging
 
 # -----------------------------
 # Doctor Dashboard
@@ -69,7 +69,8 @@ def doctor_dashboard(request):
 @login_required
 @role_required('doctor')
 def todays_appointments(request):
-    today = timezone.now().date()
+    # Get today's date (timezone-aware safe)
+    today = timezone.localdate()
 
     # Fetch all today's appointments
     appointments_list = Appointment.objects.filter(
@@ -77,8 +78,12 @@ def todays_appointments(request):
         schedule__date=today
     ).select_related('patient', 'schedule')
 
-    # Define doctor's working hours end (e.g., 6:00 PM)
-    doctor_end_time = timezone.datetime.combine(today, timezone.datetime.strptime("18:00", "%H:%M").time())
+    # Define doctor's working hours end (e.g., 6:00 PM) in timezone-aware form
+    doctor_end_time = timezone.make_aware(
+        timezone.datetime.combine(today, time(18, 0)),
+        timezone.get_current_timezone()
+    )
+
     now = timezone.now()
 
     # Auto-cancel no-shows
@@ -86,7 +91,12 @@ def todays_appointments(request):
         if appt.status == 'booked':
             has_prescription = Prescription.objects.filter(appointment=appt).exists()
             is_after_shift = now > doctor_end_time
-            is_time_passed = appt.schedule.start_time < now.time()
+            # Compare full datetimes instead of time-only to avoid naive/aware mix
+            appointment_start_dt = timezone.make_aware(
+                timezone.datetime.combine(today, appt.schedule.start_time),
+                timezone.get_current_timezone()
+            )
+            is_time_passed = now > appointment_start_dt
 
             if is_after_shift and is_time_passed and not has_prescription:
                 appt.status = 'cancelled'
@@ -109,7 +119,7 @@ def todays_appointments(request):
         'appointments': appointments,
         'search_query': request.GET.get('search', ''),
         'all_medicines': all_medicines,
-        'CONSULTATION_FEE': settings.CONSULTATION_FEE,
+        'CONSULTATION_FEE': getattr(settings, 'CONSULTATION_FEE', 500),  # Default ₹500
     })
 
 # -----------------------------
@@ -322,18 +332,42 @@ def profile_update(request):
 @login_required
 @role_required('doctor')
 def appointment_details(request, appointment_id):
+    """
+    View to display appointment details, diagnosis, and prescriptions in read-only mode.
+    """
     appointment = get_object_or_404(Appointment, id=appointment_id, doctor=request.user)
-    
-    # Get diagnosis notes and prescriptions for this appointment
-    diagnosis_notes = DiagnosisNote.objects.filter(patient=appointment.patient, doctor=request.user)
-    prescriptions = Prescription.objects.filter(patient=appointment.patient, doctor=request.user)
-    
+
+    # ✅ Fetch notes and prescriptions for this specific appointment
+    diagnosis_notes = DiagnosisNote.objects.filter(
+        patient=appointment.patient,
+        doctor=request.user,
+        appointment=appointment
+    ).order_by('-created_at')
+
+    prescriptions = Prescription.objects.filter(
+        patient=appointment.patient,
+        doctor=request.user,
+        appointment=appointment
+    ).order_by('-created_at')
+
+    # --- Determine if the doctor can prescribe ---
+    today = date.today()
+    can_prescribe = (
+        appointment.status == 'booked' and
+        appointment.schedule.date == today
+    )
+
     context = {
         'appointment': appointment,
         'diagnosis_notes': diagnosis_notes,
         'prescriptions': prescriptions,
+        'can_prescribe': can_prescribe,
+        'today': today,
     }
+
     return render(request, 'doctors/appointment_details_readonly.html', context)
+
+logger = logging.getLogger(__name__)
 
 @login_required
 @role_required('doctor')
@@ -346,7 +380,7 @@ def appointment_details_update(request, appointment_id):
     
     if appointment_date != today:
         messages.error(request, 'You can only add diagnosis and prescription for appointments scheduled for today.')
-        return redirect('doctors:appointment_details', appointment_id=appointment_id)
+        return redirect('doctors:appointment_details', appointment_id=appointment_id) 
     
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -357,36 +391,81 @@ def appointment_details_update(request, appointment_id):
             dosage = request.POST.get('dosage')
             instructions = request.POST.get('instructions')
             
-            # Both diagnosis and prescription are required
-            if diagnosis_note and medicine_name and dosage:
-                # Create diagnosis note
-                diagnosis = DiagnosisNote.objects.create(
-                    patient=appointment.patient,
-                    doctor=request.user,
-                    note=diagnosis_note
-                )
-                
-                # Create prescription
-                medication, created = Medication.objects.get_or_create(name=medicine_name)
-                prescription = Prescription.objects.create(
-                    patient=appointment.patient,
-                    doctor=request.user,
-                    medication=medication,
-                    dosage=dosage,
-                    instructions=instructions or ''
-                )
-                
-                # Mark appointment as completed
-                appointment.status = 'completed'
-                appointment.save()
-                
-                messages.success(request, 'Diagnosis and prescription added successfully. Appointment marked as completed.')
-                # Redirect to the updated appointment details page
-                return redirect('doctors:appointment_updated', appointment_id=appointment_id)
+            if diagnosis_note:
+                try:
+                    # ✅ Create diagnosis note linked to the appointment
+                    diagnosis = DiagnosisNote.objects.create(
+                        patient=appointment.patient,
+                        doctor=request.user,
+                        appointment=appointment,
+                        note=diagnosis_note
+                    )
+                    
+                    # ✅ Process multiple prescriptions
+                    prescription_count = 0
+                    for key in request.POST.keys():
+                        if key.startswith('medicine_') and key.endswith('_id'):
+                            # Extract the row index from the field name
+                            row_index = key.split('_')[1]
+                            
+                            medicine_id = request.POST.get(f'medicine_{row_index}_id')
+                            dosage = request.POST.get(f'medicine_{row_index}_dosage')
+                            frequency = request.POST.get(f'medicine_{row_index}_frequency')
+                            duration_days = request.POST.get(f'medicine_{row_index}_duration_days')
+                            instructions = request.POST.get(f'medicine_{row_index}_instructions')
+                            
+                            if medicine_id and dosage:
+                                try:
+                                    medication = Medication.objects.get(id=medicine_id)
+                                    prescription = Prescription.objects.create(
+                                        patient=appointment.patient,
+                                        doctor=request.user,
+                                        medication=medication,
+                                        dosage=dosage,
+                                        frequency=frequency or '',
+                                        duration_days=int(duration_days) if duration_days and duration_days.isdigit() else None,
+                                        instructions=instructions or '',
+                                        appointment=appointment
+                                    )
+                                    prescription_count += 1
+                                except Medication.DoesNotExist:
+                                    logger.warning(f"Medication with ID {medicine_id} not found")
+                                except Exception as e:
+                                    logger.error(f"Error creating prescription: {e}")
+                    
+                    if prescription_count == 0:
+                        messages.warning(request, 'Diagnosis saved, but no valid prescriptions were provided.')
+
+                    # ✅ Create a bill automatically if it doesn't exist
+                    if not Billing.objects.filter(appointment=appointment).exists():
+                        Billing.objects.create(
+                            patient=appointment.patient,
+                            appointment=appointment,
+                            amount=getattr(settings, 'CONSULTATION_FEE', 500),  # Default ₹500 if not in settings
+                            description=f"Consultation with Dr. {request.user.get_full_name()} on {today.strftime('%b %d, %Y')}",
+                            due_date=today + timedelta(days=7),  # Payment due in 7 days
+                            status='pending',
+                            is_paid=False
+                        )
+
+                    # Mark appointment as completed
+                    appointment.status = 'completed'
+                    appointment.save()
+                    
+                    messages.success(request, 'Diagnosis, prescription, and billing added successfully. Appointment marked as completed.')
+                    return redirect('doctors:appointment_updated', appointment_id=appointment_id)
+                except Exception as e:
+                    # Log the error
+                    logger.error(f"Error in appointment_details_update: {e}", exc_info=True)
+                    messages.error(request, 'An error occurred while saving. Please try again.')
+                    # Re-render the form
+                    return render(request, 'doctors/appointment_details_update.html', {'appointment': appointment})
             else:
                 messages.error(request, 'Both diagnosis note and prescription details are required.')
         
-    return render(request, 'doctors/appointment_details.html', {'appointment': appointment})
+    # For GET request, render the form
+    return render(request, 'doctors/appointment_details_update.html', {'appointment': appointment})
+
 
 @login_required
 @role_required('doctor')

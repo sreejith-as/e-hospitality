@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
-<div class="container py-3, 5">
+<div class="container py-5">
   <div class="row justify-content-center">
     <div class="col-lg-9">
 
       <!-- Page Title -->
       <div class="d-flex align-items-center mb-4">
         <i class="bi bi-journal-text text-primary me-2" style="font-size: 1.75rem;"></i>
-        <h2 class="mb-0 text-primary">Prescribe & Diagnose — {{ appointment.patient.get_full_name }}</h2>
+        <h2 class="mb-0 text-primary">Appointment Details</h2>
       </div>
 
-      <!-- Patient & Appointment Card -->
+      <!-- Patient & Appointment Card (Keep this part as is) -->
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-light">
           <h5 class="card-title mb-0">
@@ -48,230 +48,176 @@
               </div>
             </div>
           </div>
-
-          <hr class="my-3">
-
+<hr class="my-3">
           <div class="mb-3">
             <strong class="text-muted">Symptoms:</strong>
             <p class="ms-1 mt-1 text-dark">
               {{ appointment.symptoms|default:"No symptoms reported."|linebreaks }}
             </p>
           </div>
+          <div class="mb-4">
+            <strong class="text-muted">Status:</strong>
+            <span class="ms-2">
+              {% if appointment.status == 'booked' %}
+                <span class="badge bg-primary">Scheduled</span>
+              {% elif appointment.status == 'completed' %}
+                <span class="badge bg-success">Completed</span>
+              {% elif appointment.status == 'cancelled' %}
+                <span class="badge bg-danger">Cancelled</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ appointment.status|title }}</span>
+              {% endif %}
+            </span>
+          </div>
         </div>
       </div>
 
-      <!-- Add Diagnosis & Prescription Form -->
-<div class="card shadow-sm border-0">
-  <div class="card-header bg-light">
-    <h5 class="mb-0">
-      <i class="bi bi-plus-circle text-success me-1"></i>
-      Add Diagnosis and Prescription
-    </h5>
-  </div>
-  <div class="card-body">
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="add_diagnosis_and_prescription">
-
-      <!-- Diagnosis Note -->
-      <div class="mb-3">
-        <label for="diagnosis_note" class="form-label fw-semibold">
-          <i class="bi bi-clipboard-pulse text-danger me-1"></i>
-          Diagnosis Note
-        </label>
-        <textarea
-          class="form-control"
-          id="diagnosis_note"
-          name="diagnosis_note"
-          rows="4"
-          placeholder="e.g., Viral Fever, Hypertension, Diabetes"
-          required
-        ></textarea>
-        <div class="form-text">Enter the primary diagnosis for this visit</div>
-      </div>
-
-      <!-- Medicine Search -->
-      <div class="mb-3">
-        <label for="medicine_search" class="form-label fw-semibold">
-          <i class="bi bi-capsule text-primary me-1"></i>
-          Search & Select Medicine
-        </label>
-        <div class="position-relative">
-          <input
-            type="text"
-            class="form-control"
-            id="medicine_search"
-            placeholder="Start typing to search medicine..."
-            autocomplete="off"
-            required
-          >
-          <!-- Hidden input to store the selected medicine ID -->
-          <input type="hidden" name="medicine_id" id="medicine_id" required>
-          <div
-            id="medicine_suggestions"
-            class="position-absolute bg-white border shadow-sm rounded mt-1 w-100"
-            style="display: none; max-height: 200px; overflow-y: auto; z-index: 1000;"
-          ></div>
+      <!-- Add Diagnosis & Multiple Prescriptions Form -->
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">
+            <i class="bi bi-plus-circle text-success me-1"></i>
+            Add Diagnosis and Prescriptions
+          </h5>
         </div>
-        <div class="form-text">Select a medicine from the list</div>
-        <!-- Display selected medicine name for confirmation -->
-        <div id="selected_medicine_display" class="mt-2 text-success fw-semibold" style="display: none;"></div>
+        <div class="card-body">
+          <form method="post" id="prescription-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_diagnosis_and_prescription">
+
+            <!-- Diagnosis Note -->
+            <div class="mb-3">
+              <label for="diagnosis_note" class="form-label fw-semibold">
+                <i class="bi bi-clipboard-pulse text-danger me-1"></i>
+                Diagnosis Note
+              </label>
+              <textarea
+                class="form-control"
+                id="diagnosis_note"
+                name="diagnosis_note"
+                rows="4"
+                placeholder="e.g., Viral Fever, Hypertension, Diabetes"
+                required
+              ></textarea>
+              <div class="form-text">Enter the primary diagnosis for this visit</div>
+            </div>
+
+            <!-- Prescriptions Section -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-capsule text-primary me-1"></i>
+                Prescribed Medicines
+              </label>
+
+              <!-- Prescriptions Table -->
+              <div class="table-responsive">
+                <table class="table table-bordered align-middle" id="prescriptions-table">
+                  <thead class="table-light">
+                    <tr>
+                      <th width="30%">Medicine</th>
+                      <th width="15%">Dosage</th>
+                      <th width="15%">Frequency</th>
+                      <th width="10%">Duration (Days)</th>
+                      <th width="15%">Instructions</th>
+                      <th width="10%">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="prescription-rows">
+                    <!-- Initial empty row or pre-filled rows can go here -->
+                    <tr class="prescription-row">
+                      <td>
+                        <!-- Medicine Search Input -->
+                        <div class="position-relative">
+                          <input type="text" class="form-control medicine-search-input" placeholder="Search medicine..." autocomplete="off">
+                          <input type="hidden" class="medicine-id-input" name="medicine_0_id"> <!-- Dynamic name -->
+                          <div class="suggestions position-absolute bg-white border shadow-sm rounded mt-1 w-100" style="display: none; max-height: 200px; overflow-y: auto; z-index: 1000;"></div>
+                        </div>
+                      </td>
+                      <td><input type="text" class="form-control" name="medicine_0_dosage" placeholder="e.g., 500mg"></td>
+                      <td><input type="text" class="form-control" name="medicine_0_frequency" placeholder="e.g., Twice Daily"></td>
+                      <td><input type="number" class="form-control" name="medicine_0_duration_days" min="1" placeholder="e.g., 7"></td>
+                      <td><input type="text" class="form-control" name="medicine_0_instructions" placeholder="e.g., After meals"></td>
+                      <td><button type="button" class="btn btn-sm btn-danger remove-medicine-row">Remove</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="add-medicine-row">
+                <i class="bi bi-plus-circle me-1"></i> Add Another Medicine
+              </button>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-success px-4">
+                <i class="bi bi-check-circle me-1"></i> Save Diagnosis & Prescribe
+              </button>
+              <a href="{% url 'doctors:appointment_details' appointment.id %}" class="btn btn-outline-secondary px-4">
+                <i class="bi bi-arrow-left me-1"></i> Back to Details
+              </a>
+            </div>
+          </form>
+        </div>
       </div>
 
-      <!-- Dosage -->
-      <div class="mb-3">
-        <label for="dosage" class="form-label fw-semibold">
-          <i class="bi bi-droplet text-info me-1"></i>
-          Dosage
-        </label>
-        <input
-          type="text"
-          class="form-control"
-          id="dosage"
-          name="dosage"
-          placeholder="e.g., 500mg, 1 tablet"
-          required
-        >
-      </div>
-
-      <!-- Frequency (Optional) -->
-      <div class="mb-3">
-        <label for="frequency" class="form-label fw-semibold">
-          <i class="bi bi-arrow-repeat text-warning me-1"></i>
-          Frequency (Optional)
-        </label>
-        <input
-          type="text"
-          class="form-control"
-          id="frequency"
-          name="frequency"
-          placeholder="e.g., Twice Daily, Once Daily"
-        >
-        <div class="form-text">How often the medicine should be taken</div>
-      </div>
-
-        <!-- Duration (Optional) -->
-        <div class="mb-3">
-        <label for="duration_days" class="form-label fw-semibold">
-          <i class="bi bi-calendar-day text-primary me-1"></i>
-          Duration (Days) (Optional)
-        </label>
-        <input
-          type="number"
-          class="form-control"
-          id="duration_days"
-          name="duration_days"
-          min="1"
-          placeholder="e.g., 7, 14"
-        >
-        <div class="form-text">Number of days to take the medicine</div>
-      </div>
-
-      <!-- Instructions -->
-      <div class="mb-3">
-        <label for="instructions" class="form-label fw-semibold">
-          <i class="bi bi-journal-text text-secondary me-1"></i>
-          Instructions (Optional)
-        </label>
-        <textarea
-          class="form-control"
-          id="instructions"
-          name="instructions"
-          rows="3"
-          placeholder="e.g., Take after meals, on an empty stomach"
-        ></textarea>
-        <div class="form-text">Specific usage instructions for the patient</div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-success px-4" id="submit-btn" disabled>
-          <i class="bi bi-check-circle me-1"></i> Save Diagnosis & Prescribe
-        </button>
-        <a href="#" onclick="history.back()" class="btn btn-outline-secondary px-4">
-          <i class="bi bi-arrow-left me-1"></i> Back to Details
-        </a>
-      </div>
-      </form>
-      </div>
-      </div>
     </div>
   </div>
 </div>
 
-<!-- Optional: Bootstrap Icons -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
-<!-- Medicine Search Script -->
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const searchInput = document.getElementById('medicine_search');
-    const suggestionsBox = document.getElementById('medicine_suggestions');
-    const medicineIdInput = document.getElementById('medicine_id');
-    const submitBtn = document.getElementById('submit-btn');
-    const selectedMedicineDisplay = document.getElementById('selected_medicine_display');
+// Use Django's url template tag to get the correct URL for the search endpoint
+const searchMedicineUrl = "{% url 'doctors:search_medicine' %}";
+// Fetch all medicines for initial cache (optional fallback or pre-populate)
+const allMedicines = [
+  {% for med in all_medicines %}
+    {
+      id: {{ med.id }},
+      name: "{{ med.name|escapejs }}",
+      unit: "{{ med.unit|escapejs }}",
+      price: {{ med.price|floatformat:2 }}
+    }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+];
 
-    // Fetch medicines from template context (passed by the view)
-    // Ensure 'all_medicines' is passed in the context by the view
-    const medicines = [
-      {% for med in all_medicines %}
-        {
-          id: {{ med.id }},
-          name: "{{ med.name|escapejs }}",
-          // Add other relevant fields if needed for display, e.g., unit, price
-          unit: "{{ med.unit|escapejs }}",
-          price: "{{ med.price|floatformat:2|escapejs }}"
-        }{% if not forloop.last %},{% endif %}
-      {% endfor %}
-    ];
+document.addEventListener('DOMContentLoaded', function () {
+  const prescriptionTableBody = document.getElementById('prescription-rows');
+  const addRowButton = document.getElementById('add-medicine-row');
 
-    // Show suggestions
-    function showSuggestions(query) {
-      suggestionsBox.innerHTML = '';
-      if (!query) {
-        suggestionsBox.style.display = 'none';
-        return;
-      }
+  let rowIndex = 1; // Start indexing from 1 if 0 is used for the initial row
 
-      const filtered = medicines.filter(med =>
-        med.name.toLowerCase().includes(query.toLowerCase()) //||
-        //med.unit.toLowerCase().includes(query.toLowerCase()) // Optional: search by unit
-      );
+  // --- Function to Add a New Row ---
+  function addNewRow() {
+    const newRow = document.createElement('tr');
+    newRow.className = 'prescription-row';
+    newRow.innerHTML = `
+      <td>
+        <div class="position-relative">
+          <input type="text" class="form-control medicine-search-input" placeholder="Search medicine..." autocomplete="off">
+          <input type="hidden" class="medicine-id-input" name="medicine_${rowIndex}_id">
+          <div class="suggestions position-absolute bg-white border shadow-sm rounded mt-1 w-100" style="display: none; max-height: 200px; overflow-y: auto; z-index: 1000;"></div>
+        </div>
+      </td>
+      <td><input type="text" class="form-control" name="medicine_${rowIndex}_dosage" placeholder="e.g., 500mg"></td>
+      <td><input type="text" class="form-control" name="medicine_${rowIndex}_frequency" placeholder="e.g., Twice Daily"></td>
+      <td><input type="number" class="form-control" name="medicine_${rowIndex}_duration_days" min="1" placeholder="e.g., 7"></td>
+      <td><input type="text" class="form-control" name="medicine_${rowIndex}_instructions" placeholder="e.g., After meals"></td>
+      <td><button type="button" class="btn btn-sm btn-danger remove-medicine-row">Remove</button></td>
+    `;
+    prescriptionTableBody.appendChild(newRow);
 
-      if (filtered.length === 0) {
-        const div = document.createElement('div');
-        div.className = 'p-2 text-muted';
-        div.textContent = 'No medicines found.';
-        suggestionsBox.appendChild(div);
-      } else {
-        // Limit suggestions to improve performance
-        filtered.slice(0, 15).forEach(med => {
-          const div = document.createElement('div');
-          div.className = 'p-2 border-bottom';
-          div.style = 'cursor: pointer; font-size: 0.9rem;';
-          // Display name and optionally unit/price
-          div.innerHTML = `
-            <strong>${med.name}</strong>
-            ${med.unit ? `<small class="text-muted">(${med.unit})</small>` : ''}
-            ${med.price ? `<br><small class="text-success">₹${med.price}</small>` : ''}
-          `;
-          div.addEventListener('click', () => {
-            // On selection, populate the hidden ID field and the display area
-            searchInput.value = med.name; // Show name in the search box
-            medicineIdInput.value = med.id; // Store the ID
-            selectedMedicineDisplay.textContent = `Selected: ${med.name}`;
-            selectedMedicineDisplay.style.display = 'block';
-            suggestionsBox.style.display = 'none';
-            // Enable the submit button
-            submitBtn.disabled = false;
-          });
-          suggestionsBox.appendChild(div);
-        });
-      }
-      suggestionsBox.style.display = 'block';
-    }
+    // Initialize search for the new row
+    const newSearchInput = newRow.querySelector('.medicine-search-input');
+    const newSuggestionsBox = newRow.querySelector('.suggestions');
+    const newHiddenIdInput = newRow.querySelector('.medicine-id-input');
+    initMedicineSearch(newSearchInput, newSuggestionsBox, newHiddenIdInput, allMedicines);
 
-    // Debounce function to limit how often the search runs
+    rowIndex++;
+  }
+
+  // --- Function to Initialize Search for a Row ---
+  function initMedicineSearch(searchInput, suggestionsBox, hiddenIdInput, medicinesCache) {
     function debounce(func, delay) {
       let timeout;
       return function () {
@@ -281,39 +227,104 @@
       };
     }
 
-    // Event listeners
-    searchInput.addEventListener('focus', () => {
-      if (searchInput.value) showSuggestions(searchInput.value);
-    });
+    async function fetchSuggestions(query) {
+      suggestionsBox.innerHTML = '';
+      if (!query.trim()) {
+        suggestionsBox.style.display = 'none';
+        return;
+      }
+
+      try {
+        const response = await fetch(`${searchMedicineUrl}?q=${encodeURIComponent(query.trim())}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        suggestionsBox.innerHTML = '';
+        if (data.results && data.results.length > 0) {
+          data.results.slice(0, 15).forEach(med => {
+            const div = document.createElement('div');
+            div.className = 'p-2 border-bottom';
+            div.style.cssText = 'cursor: pointer; font-size: 0.9rem;';
+            div.innerHTML = `
+              <strong>${med.name}</strong>
+              ${med.unit ? `<small class="text-muted">(${med.unit})</small>` : ''}
+              ${med.price !== undefined ? `<br><small class="text-success">₹${med.price.toFixed(2)}</small>` : ''}
+            `;
+            div.addEventListener('click', () => {
+              searchInput.value = med.name;
+              hiddenIdInput.value = med.id;
+              suggestionsBox.style.display = 'none';
+            });
+            suggestionsBox.appendChild(div);
+          });
+          suggestionsBox.style.display = 'block';
+        } else {
+          suggestionsBox.innerHTML = '<div class="p-2 text-muted">No medicines found.</div>';
+          suggestionsBox.style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Error fetching medicine suggestions:', error);
+        suggestionsBox.innerHTML = '<div class="p-2 text-danger">Error loading suggestions.</div>';
+        suggestionsBox.style.display = 'block';
+      }
+    }
 
     searchInput.addEventListener('input', debounce(() => {
-      showSuggestions(searchInput.value);
-    }, 300)); // 300ms delay
+      fetchSuggestions(searchInput.value);
+    }, 300));
 
-    // Click outside to close suggestions
+    searchInput.addEventListener('focus', () => {
+      if (searchInput.value.trim()) {
+        fetchSuggestions(searchInput.value);
+      }
+    });
+
     document.addEventListener('click', (e) => {
       if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
         suggestionsBox.style.display = 'none';
       }
     });
+  }
 
-    // Handle form reset (e.g., if user navigates back)
-    // This might not be strictly necessary but good practice
-    window.addEventListener('pageshow', function(event) {
-      if (event.persisted || (window.performance && window.performance.navigation.type == 2)) {
-        // Page was restored from cache (e.g., back button)
-        // Reset state if needed
-        const selectedId = medicineIdInput.value;
-        if (selectedId) {
-              const selectedMed = medicines.find(m => m.id == selectedId);
-              if (selectedMed) {
-                  selectedMedicineDisplay.textContent = `Selected: ${selectedMed.name}`;
-                  selectedMedicineDisplay.style.display = 'block';
-                  submitBtn.disabled = false;
-              }
-        }
-      }
-    });
+  // --- Initialize Search for Existing Rows (the first one) ---
+  document.querySelectorAll('.prescription-row').forEach(row => {
+    const searchInput = row.querySelector('.medicine-search-input');
+    const suggestionsBox = row.querySelector('.suggestions');
+    const hiddenIdInput = row.querySelector('.medicine-id-input');
+    if (searchInput && suggestionsBox && hiddenIdInput) {
+       initMedicineSearch(searchInput, suggestionsBox, hiddenIdInput, allMedicines);
+    }
   });
+
+  // --- Event Listener for Add Row Button ---
+  addRowButton.addEventListener('click', addNewRow);
+
+  // --- Event Delegation for Remove Row Buttons ---
+  prescriptionTableBody.addEventListener('click', function(event) {
+    if (event.target && event.target.classList.contains('remove-medicine-row')) {
+      const row = event.target.closest('.prescription-row');
+      if (row && prescriptionTableBody.children.length > 1) { // Keep at least one row
+        row.remove();
+      } else if (prescriptionTableBody.children.length === 1) {
+        // If trying to remove the last row, just clear it instead
+        const inputs = row.querySelectorAll('input');
+        inputs.forEach(input => {
+            if (input.type !== 'hidden' || !input.classList.contains('medicine-id-input')) {
+                input.value = '';
+            } else if (input.classList.contains('medicine-id-input')) {
+                 input.value = ''; // Clear hidden ID too
+            }
+        });
+        // Clear search input text and hide suggestions
+        const searchInput = row.querySelector('.medicine-search-input');
+        if (searchInput) searchInput.value = '';
+        const suggestionsBox = row.querySelector('.suggestions');
+        if (suggestionsBox) suggestionsBox.style.display = 'none';
+      }
+    }
+  });
+
+});
 </script>
+<!-- End of Medicine Search Script -->
 {% endblock %}

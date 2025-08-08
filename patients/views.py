@@ -37,58 +37,77 @@ def overview(request):
     user = request.user
     today = timezone.now().date()
 
-    # 1. Upcoming Appointments
     upcoming_appointments = Appointment.objects.filter(
         patient=user,
         schedule__date__gte=today,
         status='booked'
     ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
 
-    # 2. Medical Visits (for records count)
-    medical_visits = MedicalVisit.objects.filter(patient=user)
-    medical_records_count = medical_visits.count()  # ✅ Count all visits
+    medical_visits = MedicalVisit.objects.filter(patient=user).select_related('doctor')
 
-    # 3. Active Prescriptions
-    # You can define "active" as: recently created, or not expired
-    # For now, let's say: prescriptions from the last 6 months
-    six_months_ago = today - timezone.timedelta(days=180)
-    active_prescriptions = Prescription.objects.filter(
+    one_year_ago = today - timezone.timedelta(days=365)
+    prescriptions = Prescription.objects.filter(
         patient=user,
-        created_at__gte=six_months_ago
+        created_at__gte=one_year_ago
     ).select_related('medication', 'doctor')
 
-    # 4. Unpaid Bills
+    combined_events = []
+
+    for visit in medical_visits:
+        event_date = visit.created_at.date()
+        combined_events.append({
+            'type': 'visit',
+            'date': event_date,
+            'object': visit,
+            'timestamp': visit.created_at
+        })
+
+    for prescription in prescriptions:
+        event_date = prescription.created_at.date()
+        combined_events.append({
+            'type': 'prescription',
+            'date': event_date,
+            'object': prescription,
+            'timestamp': prescription.created_at
+        })
+
+    combined_events.sort(key=lambda x: (x['date'], x['timestamp']), reverse=True)
+
+    def paginate_combined_events(event_list, per_page=10):
+        paginator = Paginator(event_list, per_page)
+        page_number = request.GET.get('page_medical_records')
+        return paginator.get_page(page_number)
+
+    medical_records_page = paginate_combined_events(combined_events)
+
     unpaid_bills = Billing.objects.filter(
         patient=user,
         is_paid=False
     )
 
-    # Pagination for tabs
+
     def paginate(qs, per_page=10):
         paginator = Paginator(qs, per_page)
         page_key = f'page_{qs.model.__name__.lower()}'
         page_number = request.GET.get(page_key)
         return paginator.get_page(page_number)
 
-    visits_page = paginate(medical_visits)
-    prescriptions_page = paginate(active_prescriptions)
     bills_page = paginate(unpaid_bills)
 
-    # ✅ Build context with correct variable names
+    medical_records_count = len(combined_events)
+    active_prescriptions_count = prescriptions.count()
+    unpaid_bills_count = unpaid_bills.count()
+
+    recent_activity = []
+
     context = {
-        # For cards
         'upcoming_appointments': upcoming_appointments,
         'medical_records_count': medical_records_count,
-        'active_prescriptions': active_prescriptions,      # ← List (for |length)
-        'unpaid_bills': unpaid_bills,                      # ← List (for |length)
-
-        # For tabs
-        'visits_page': visits_page,
-        'prescriptions_page': prescriptions_page,
+        'active_prescriptions_count': active_prescriptions_count,
+        'unpaid_bills_count': unpaid_bills_count,
+        'medical_records_page': medical_records_page,
         'bills_page': bills_page,
-
-        # Optional: for recent activity
-        'recent_activity': []  # We'll populate below if needed
+        'recent_activity': recent_activity
     }
 
     return render(request, 'patients/dashboard.html', context)

@@ -8,18 +8,25 @@ class DiagnosisNote(models.Model):
     patient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='diagnosis_notes'
+        limit_choices_to={'role': 'patient'}
     )
     doctor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='doctor_diagnosis_notes'
+        limit_choices_to={'role': 'doctor'},
+        related_name='diagnosis_notes'
+    )
+    appointment = models.ForeignKey(
+        'patients.Appointment',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True  
     )
     note = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Diagnosis for {self.patient.get_full_name()} by Dr. {self.doctor.get_full_name()} on {self.created_at.strftime('%Y-%m-%d')}"
+        return f"Diagnosis for {self.patient.get_full_name()} on {self.created_at.strftime('%Y-%m-%d')}"
 
 
 class Treatment(models.Model):
@@ -69,11 +76,9 @@ class Medication(models.Model):
 
 class Prescription(models.Model):
     appointment = models.ForeignKey(
-        Appointment,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        help_text="The appointment during which this was prescribed"
+        'patients.Appointment',
+        on_delete=models.CASCADE, 
+        null=True, blank=True
     )
     patient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
