@@ -72,7 +72,7 @@
             </div>
 
             <!-- Symptoms -->
-            <div class="mb-4">
+            <!-- <div class="mb-4">
               <label for="{{ form.symptoms.id_for_label }}" class="form-label fw-semibold">
                 <i class="bi bi-clipboard-pulse me-1 text-danger"></i>
                 {{ form.symptoms.label }}
@@ -80,7 +80,18 @@
               {{ form.symptoms }}
               <div class="form-text">Briefly describe your symptoms or reason for visit.</div>
             </div>
-
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+              </div>
+            {% endif %}
+            {% for field in form %}
+              {% if field.errors %}
+                <div class="alert alert-danger">
+                  {{ field.label }}: {{ field.errors|join:", " }}
+                </div>
+              {% endif %}
+            {% endfor %} -->
             <!-- Action Buttons -->
             <div class="d-flex justify-content-end gap-2">
               <a href="#" onclick="history.back()" class="btn btn-outline-secondary px-4">
@@ -97,7 +108,6 @@
   </div>
 </div>
 
-<!-- Enhanced JavaScript -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const deptSelect = document.getElementById('id_department');
@@ -116,22 +126,109 @@ document.addEventListener('DOMContentLoaded', function () {
     noScheduleMessage.style.display = 'none';
   }
 
-  hideSchedule();
+  // Show schedule
+  function showSchedule() {
+    schedulePanel.classList.remove('d-none');
+  }
 
-  // Load doctors when department changes
+  // Update time slots
+  function updateTimeSlots() {
+    const doctorId = doctorSelect.value;
+    const date = dateInput.value;
+    if (!doctorId || !date) {
+      timeSelect.innerHTML = '<option value="">Select doctor and date</option>';
+      timeStatus.textContent = 'Select doctor and date to load time slots.';
+      hideSchedule();
+      return;
+    }
+
+    timeSelect.innerHTML = '<option value="">Loading...</option>';
+    timeStatus.textContent = 'Loading available time slots...';
+    hideSchedule();
+
+    const url = `{% url 'patients:get_available_time_slots' %}?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`;
+
+    fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        timeSelect.innerHTML = '<option value="">Select Time</option>';
+        if (data.available_slots && data.available_slots.length > 0) {
+          data.available_slots.forEach(timeStr => {
+            const option = document.createElement('option');
+            option.value = timeStr;
+            option.textContent = timeStr;
+            timeSelect.appendChild(option);
+          });
+          timeStatus.textContent = 'Available time slots loaded.';
+        } else {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No available time slots';
+          timeSelect.appendChild(option);
+          timeStatus.textContent = 'No available time slots for the selected date.';
+        }
+
+        // Fetch doctor's schedule
+        const scheduleUrl = `{% url 'patients:get_doctor_schedule' %}?doctor_id=${encodeURIComponent(doctorId)}`;
+        fetch(scheduleUrl)
+          .then(response => response.json())
+          .then(scheduleData => {
+            scheduleList.innerHTML = '';
+            if (scheduleData.success && scheduleData.working_hours.length > 0) {
+              scheduleData.working_hours.forEach(day => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4';
+                col.innerHTML = `
+                  <div class="p-2 bg-light border rounded">
+                    <strong>${day.day}:</strong>
+                    ${day.start_time} – ${day.end_time}
+                  </div>
+                `;
+                scheduleList.appendChild(col);
+              });
+              noScheduleMessage.style.display = 'none';
+              showSchedule();
+            } else {
+              noScheduleMessage.style.display = 'block';
+              showSchedule();
+            }
+          })
+          .catch(err => {
+            console.error("Error loading schedule:", err);
+            noScheduleMessage.textContent = "Failed to load working hours.";
+            noScheduleMessage.style.display = 'block';
+            showSchedule();
+          });
+      })
+      .catch(error => {
+        console.error('Error fetching time slots:', error);
+        timeSelect.innerHTML = '<option value="">Error loading slots</option>';
+        timeStatus.textContent = 'Failed to load time slots. Please try again.';
+        hideSchedule();
+      });
+  }
+
+  // Event listeners
   deptSelect.addEventListener('change', function () {
     const deptId = this.value;
-    hideSchedule();
     doctorSelect.innerHTML = '<option value="">Loading...</option>';
-    timeSelect.innerHTML = '<option value="">Select date to load time slots</option>';
-    timeStatus.textContent = 'Select date to load time slots.';
+    timeSelect.innerHTML = '<option value="">Select doctor to load time slots</option>';
+    timeStatus.textContent = '';
+    hideSchedule();
 
     if (!deptId) {
       doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
       return;
     }
 
-    fetch(`{% url 'patients:get_doctors_by_department' %}?department_id=${deptId}`)
+    const url = `{% url 'patients:get_doctors_by_department' %}?department_id=${encodeURIComponent(deptId)}`;
+
+    fetch(url)
       .then(response => response.json())
       .then(data => {
         doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
@@ -142,87 +239,11 @@ document.addEventListener('DOMContentLoaded', function () {
           doctorSelect.appendChild(option);
         });
       })
-      .catch(() => {
+      .catch(error => {
+        console.error('Error fetching doctors:', error);
         doctorSelect.innerHTML = '<option value="">Error loading doctors</option>';
       });
   });
-
-  // Load doctor schedule when doctor changes
-  doctorSelect.addEventListener('change', function () {
-    const doctorId = this.value;
-    hideSchedule();
-
-    if (!doctorId) return;
-
-    fetch(`{% url 'patients:get_doctor_schedule' %}?doctor_id=${doctorId}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.success && data.working_hours.length > 0) {
-          scheduleList.innerHTML = '';
-          data.working_hours.forEach(slot => {
-            const col = document.createElement('div');
-            col.className = 'col-md-4 col-sm-6';
-            col.innerHTML = `
-              <div class="bg-white border rounded p-2 text-center">
-                <small class="text-secondary d-block">${slot.day}</small>
-                <strong class="text-dark">${slot.start_time} – ${slot.end_time}</strong>
-              </div>
-            `;
-            scheduleList.appendChild(col);
-          });
-          schedulePanel.classList.remove('d-none');
-        } else {
-          noScheduleMessage.style.display = 'block';
-          schedulePanel.classList.remove('d-none');
-        }
-      })
-      .catch(err => {
-        console.error("Error loading schedule:", err);
-        noScheduleMessage.textContent = "Failed to load working hours.";
-        noScheduleMessage.style.display = 'block';
-        schedulePanel.classList.remove('d-none');
-      });
-  });
-
-  // Update time slots when doctor or date changes
-  function updateTimeSlots() {
-    const doctorId = doctorSelect.value;
-    const date = dateInput.value;
-    if (!doctorId || !date) {
-      timeSelect.innerHTML = '<option value="">Select doctor and date</option>';
-      timeStatus.textContent = 'Select doctor and date to load time slots.';
-      return;
-    }
-
-    timeSelect.innerHTML = '<option value="">Loading...</option>';
-    timeStatus.textContent = 'Loading available time slots...';
-
-    fetch(`{% url 'patients:get_available_time_slots' %}?doctor_id=${doctorId}&date=${date}`)
-      .then(response => response.json())
-      .then(data => {
-        timeSelect.innerHTML = '<option value="">Select Time</option>';
-        if (data.available_slots.length === 0) {
-          const option = document.createElement('option');
-          option.value = '';
-          option.textContent = 'No slots available';
-          option.disabled = true;
-          timeSelect.appendChild(option);
-          timeStatus.textContent = 'No available slots for this date.';
-        } else {
-          data.available_slots.forEach(slot => {
-            const option = document.createElement('option');
-            option.value = slot;
-            option.textContent = slot;
-            timeSelect.appendChild(option);
-          });
-          timeStatus.textContent = 'Select a convenient time.';
-        }
-      })
-      .catch(() => {
-        timeSelect.innerHTML = '<option value="">Error loading slots</option>';
-        timeStatus.textContent = 'Could not load time slots.';
-      });
-  }
 
   doctorSelect.addEventListener('change', updateTimeSlots);
   dateInput.addEventListener('change', updateTimeSlots);

@@ -438,15 +438,31 @@ def appointment_details_update(request, appointment_id):
 
                     # ✅ Create a bill automatically if it doesn't exist
                     if not Billing.objects.filter(appointment=appointment).exists():
+                        # Get all prescriptions linked to this appointment
+                        prescriptions = Prescription.objects.filter(appointment=appointment)
+                        
+                        # Sum up line totals
+                        total_medicine_cost = sum(p.line_total for p in prescriptions)
+
+                        # Get consultation fee from settings
+                        consultation_fee = getattr(settings, 'CONSULTATION_FEE', 300)  # Default ₹300
+
+                        # Total amount
+                        total_amount = total_medicine_cost + consultation_fee
+
+                        # Create the bill
                         Billing.objects.create(
                             patient=appointment.patient,
                             appointment=appointment,
-                            amount=getattr(settings, 'CONSULTATION_FEE', 500),  # Default ₹500 if not in settings
-                            description=f"Consultation with Dr. {request.user.get_full_name()} on {today.strftime('%b %d, %Y')}",
-                            due_date=today + timedelta(days=7),  # Payment due in 7 days
+                            amount=total_amount,
+                            description=f"Consultation + Medicines for {appointment.patient.get_full_name()}",
+                            due_date=today + timedelta(days=7),
                             status='pending',
                             is_paid=False
                         )
+
+                        # Optional: Log for debugging
+                        print(f"Billing created: ₹{total_amount} = ₹{total_medicine_cost} (meds) + ₹{consultation_fee} (consultation)")
 
                     # Mark appointment as completed
                     appointment.status = 'completed'

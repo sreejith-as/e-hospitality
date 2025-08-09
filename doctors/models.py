@@ -104,20 +104,36 @@ class Prescription(models.Model):
         return f"Rx: {self.medication.name} for {self.patient.get_full_name()}"
 
     def save(self, *args, **kwargs):
-        # Auto-calculate quantity
-        if self.frequency and self.duration_days and not self.quantity:
-            try:
-                freq_num = int(self.frequency.split()[0]) if self.frequency and self.frequency[0].isdigit() else 1
-                self.quantity = freq_num * self.duration_days
-            except:
-                self.quantity = 1
+    # Map common frequency strings to numbers
+        FREQUENCY_MAP = {
+            'once': 1,
+            'daily': 1,
+            'every day': 1,
+            'twice': 2,
+            'two times': 2,
+            'thrice': 3,
+            'three times': 3,
+            'four': 4,
+            'four times': 4,
+            'morning and evening': 2,
+            'am and pm': 2,
+        }
 
-        # Auto-calculate line_total
+        # Only recalculate if quantity is missing or 1
+        if self.frequency and self.duration_days and (not self.quantity or self.quantity == 1):
+            freq = self.frequency.lower()
+            freq_num = 1  # default
+            for key, value in FREQUENCY_MAP.items():
+                if key in freq:
+                    freq_num = value
+                    break
+            self.quantity = freq_num * self.duration_days
+
+        # Recalculate line_total if medication has price
         if self.medication.price:
             self.line_total = self.medication.price * self.quantity
 
         super().save(*args, **kwargs)
-
 
 class DoctorAvailability(models.Model):
     """
