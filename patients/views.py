@@ -165,6 +165,39 @@ def appointments(request):
 # -----------------------------
 # Medical Records
 # ----------------------------
+@login_required
+@role_required('patient')
+def medical_record_detail(request, appointment_id):
+    # Get the appointment, ensuring it belongs to the logged-in patient
+    appointment = get_object_or_404(Appointment, id=appointment_id, patient=request.user, status='completed')
+
+    # Get diagnosis notes for this appointment
+    diagnosis_notes = DiagnosisNote.objects.filter(
+        appointment=appointment,
+        patient=request.user
+    ).order_by('-created_at')
+
+    # Get prescriptions for this appointment
+    prescriptions = Prescription.objects.filter(
+        appointment=appointment,
+        patient=request.user
+    ).select_related('medication')
+
+    # Try to get the associated bill
+    try:
+        bill = Billing.objects.get(appointment=appointment)
+    except Billing.DoesNotExist:
+        bill = None
+
+    context = {
+        'appointment': appointment,
+        'diagnosis_notes': diagnosis_notes,
+        'prescriptions': prescriptions,
+        'bill': bill,
+    }
+
+    return render(request, 'patients/medical_record_detail.html', context)
+
 # -----------------------------
 # Visit Detail & PDF Download
 # -----------------------------
@@ -197,37 +230,46 @@ def visit_detail(request, appointment_id):
 def download_visit_pdf(request, appointment_id):
     appointment = get_object_or_404(Appointment, id=appointment_id, patient=request.user)
 
-    # Get related data
-    medical_history = MedicalVisit.objects.filter(
+    # Get diagnosis notes
+    from doctors.models import DiagnosisNote
+    diagnosis_notes = DiagnosisNote.objects.filter(
+        appointment=appointment,
         patient=request.user
-    ).order_by('-created_at')[:5]  # Use created_at, not updated_at
+    ).order_by('-created_at')
 
+    # Get prescriptions
     prescriptions = Prescription.objects.filter(
-        patient=request.user,
-        doctor=appointment.doctor
-    ).select_related('medication', 'doctor').order_by('-created_at')[:10]
+        appointment=appointment,
+        patient=request.user
+    ).select_related('medication', 'doctor').order_by('-created_at')
 
-    # Try to get the bill for this appointment
+    # Try to get bill
     try:
         bill = Billing.objects.get(appointment=appointment)
         total_amount = bill.amount
         is_paid = bill.is_paid
         due_date = bill.due_date
     except Billing.DoesNotExist:
+        bill = None
         total_amount = 0
         is_paid = False
         due_date = None
 
-    # Calculate medicine cost (if prescriptions exist)
-    total_medicine_cost = sum(p.line_total for p in prescriptions)
-    consultation_fee = settings.CONSULTATION_FEE
+    # Calculate medicine cost
+    consultation_fee = getattr(settings, 'CONSULTATION_FEE', 500.00)
+    total_medicine_cost = 0
+    for p in prescriptions:
+        # Use medication price if exists
+        price = getattr(p.medication, 'price', 0)
+        total_medicine_cost += price
+
     expected_total = total_medicine_cost + consultation_fee
 
     # Create PDF
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
-    y = height - 100  # Start position
+    y = height - 100
 
     # Header
     p.setFont("Helvetica-Bold", 16)
@@ -248,57 +290,41 @@ def download_visit_pdf(request, appointment_id):
     p.setFont("Helvetica-Bold", 14)
     p.drawString(50, y, "Visit Information")
     y -= 25
-
     p.setFont("Helvetica", 11)
     p.drawString(50, y, f"Doctor: Dr. {appointment.doctor.get_full_name()}")
     y -= 15
-
-    # Date and Time
     p.drawString(50, y, f"Date: {appointment.schedule.date.strftime('%b %d, %Y')}")
     y -= 15
     p.drawString(50, y, f"Time: {appointment.schedule.start_time.strftime('%I:%M %p')}")
     y -= 15
-    p.drawString(50, y, "Duration: 30 minutes")
-    y -= 30
-
-    # Symptoms
-    p.setFont("Helvetica-Bold", 14)
-    p.drawString(50, y, "Symptoms & Reason for Visit")
-    y -= 25
-
-    p.setFont("Helvetica", 11)
     symptoms = appointment.symptoms or "Not specified"
     p.drawString(50, y, f"Symptoms: {symptoms}")
     y -= 30
 
-    # Medical History
-    if medical_history:
+    # Diagnosis
+    if diagnosis_notes:
         p.setFont("Helvetica-Bold", 14)
-        p.drawString(50, y, "Medical History")
+        p.drawString(50, y, "Diagnosis")
         y -= 25
-
         p.setFont("Helvetica", 11)
-        for record in medical_history:
-            diagnosis = record.diagnosis or "Unknown"
-            p.drawString(50, y, f"Diagnosis: {diagnosis}")
-            y -= 15
-
-            treatment = record.treatments or "None"
-            p.drawString(50, y, f"Treatment: {treatment}")
-            y -= 20
-
+        for note in diagnosis_notes:
             if y < 100:
                 p.showPage()
                 y = height - 50
+            p.drawString(50, y, f"• {note.note}")
+            y -= 15
+        y -= 10
 
     # Prescriptions
     if prescriptions:
         p.setFont("Helvetica-Bold", 14)
         p.drawString(50, y, "Prescriptions")
         y -= 25
-
         p.setFont("Helvetica", 11)
         for prescription in prescriptions:
+            if y < 100:
+                p.showPage()
+                y = height - 50
             p.drawString(50, y, f"Medication: {prescription.medication.name}")
             y -= 15
             p.drawString(50, y, f"Dosage: {prescription.dosage}")
@@ -307,20 +333,14 @@ def download_visit_pdf(request, appointment_id):
             y -= 15
             p.drawString(50, y, f"Duration: {prescription.duration_days} days")
             y -= 15
-            instructions = prescription.instructions or "As directed"
-            p.drawString(50, y, f"Instructions: {instructions}")
+            p.drawString(50, y, f"Instructions: {prescription.instructions or 'As directed'}")
             y -= 20
 
-            if y < 100:
-                p.showPage()
-                y = height - 50
-
-    # Billing Summary
+    # Billing
     y -= 20
     p.setFont("Helvetica-Bold", 14)
     p.drawString(50, y, "Billing Summary")
     y -= 25
-
     p.setFont("Helvetica", 11)
     p.drawString(50, y, f"Medicine Cost: ₹{total_medicine_cost:.2f}")
     y -= 20
@@ -329,7 +349,7 @@ def download_visit_pdf(request, appointment_id):
     p.drawString(50, y, f"Expected Total: ₹{expected_total:.2f}")
     y -= 20
 
-    if total_amount > 0:
+    if bill:
         p.drawString(50, y, f"Billed Amount: ₹{total_amount:.2f}")
         y -= 20
         status = "Paid" if is_paid else "Unpaid"
@@ -338,32 +358,25 @@ def download_visit_pdf(request, appointment_id):
         if due_date:
             p.drawString(50, y, f"Due Date: {due_date.strftime('%b %d, %Y')}")
             y -= 20
-    else:
-        p.drawString(50, y, "No bill generated for this visit.")
-        y -= 20
 
+    # Footer
     if y < 100:
         p.showPage()
         y = height - 50
-
-    # Footer
     p.setFont("Helvetica-Oblique", 10)
     p.drawString(50, y, "This visit report was generated from the eHospital system.")
     y -= 15
-    p.drawString(50, y, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    p.drawString(50, y, f"Generated on: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
     y -= 15
 
-    # Finalize PDF
     p.showPage()
     p.save()
     buffer.seek(0)
 
-    # Return as response
     filename = f"visit_{appointment.id}_{appointment.patient.username}.pdf"
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
-
 # -----------------------------
 # Billing & Payments
 # -----------------------------

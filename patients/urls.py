@@ -20,6 +20,9 @@ urlpatterns = [
     path('cancel-appointment/<int:appointment_id>/', views.cancel_appointment, name='cancel_appointment'),
     path('edit-appointment/<int:appointment_id>/', views.edit_appointment, name='edit_appointment'),
 
+    # Medical Record
+    path('medical-record/<int:appointment_id>/', views.medical_record_detail, name='medical_record_detail'),
+    
     # Billing
     path('pay-bill/<int:billing_id>/', views.pay_bill, name='pay_bill'),
 
