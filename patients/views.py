@@ -11,8 +11,10 @@ from django.contrib.auth.forms import UserCreationForm
 from accounts.utils import role_required
 from django.utils import timezone
 from datetime import date, datetime, time, timedelta
+
+from admins.models import DoctorAllocation, Department
 from .models import Billing, Appointment, MedicalVisit, TimeSlot
-from doctors.models import DoctorAvailability, Prescription
+from doctors.models import DoctorAvailability, Prescription, DiagnosisNote
 from accounts.models import CustomUser
 from .forms import AppointmentBookingForm
 from django.db.models import Sum, Count
@@ -37,68 +39,70 @@ def overview(request):
     user = request.user
     today = timezone.now().date()
 
+    # Upcoming Appointments
     upcoming_appointments = Appointment.objects.filter(
         patient=user,
         schedule__date__gte=today,
         status='booked'
     ).select_related('doctor', 'schedule').order_by('schedule__date', 'schedule__start_time')
 
-    medical_visits = MedicalVisit.objects.filter(patient=user).select_related('doctor')
-
-    one_year_ago = today - timezone.timedelta(days=365)
-    prescriptions = Prescription.objects.filter(
+    # Completed Appointments for Medical Records
+    completed_appointments = Appointment.objects.filter(
         patient=user,
-        created_at__gte=one_year_ago
-    ).select_related('medication', 'doctor')
+        status='completed'
+    ).select_related('doctor', 'schedule').order_by('-schedule__date')
 
-    combined_events = []
+    medical_records = []
+    for appointment in completed_appointments:
+        # Get diagnosis notes
+        diagnosis_notes = DiagnosisNote.objects.filter(
+            appointment=appointment,
+            patient=user
+        ).values_list('note', flat=True)
+        diagnosis_text = "; ".join(diagnosis_notes) if diagnosis_notes else "No diagnosis recorded"
 
-    for visit in medical_visits:
-        event_date = visit.created_at.date()
-        combined_events.append({
-            'type': 'visit',
-            'date': event_date,
-            'object': visit,
-            'timestamp': visit.created_at
+        # Get prescriptions (only medicine names)
+        prescriptions = Prescription.objects.filter(
+            appointment=appointment,
+            patient=user
+        ).select_related('medication')
+        medicines = [p.medication.name for p in prescriptions]
+        medicines_text = ", ".join(medicines) if medicines else "No medicines prescribed"
+
+        # Get department via DoctorAllocation
+        try:
+            allocation = DoctorAllocation.objects.get(doctor=appointment.doctor)
+            department_name = allocation.department.name
+        except DoctorAllocation.DoesNotExist:
+            department_name = "General Practice"
+        except Exception:
+            department_name = "General Practice"
+
+        medical_records.append({
+            'appointment': appointment,
+            'date': appointment.schedule.date,
+            'doctor_name': f"Dr. {appointment.doctor.get_full_name()}",
+            'department': department_name,
+            'diagnosis': diagnosis_text,
+            'medicines': medicines_text,
+            'detail_url': reverse('patients:visit_detail', args=[appointment.id])
         })
 
-    for prescription in prescriptions:
-        event_date = prescription.created_at.date()
-        combined_events.append({
-            'type': 'prescription',
-            'date': event_date,
-            'object': prescription,
-            'timestamp': prescription.created_at
-        })
+    # Paginate medical records
+    medical_records_paginator = Paginator(medical_records, 5)
+    medical_records_page_number = request.GET.get('page_medical_records')
+    medical_records_page = medical_records_paginator.get_page(medical_records_page_number)
 
-    combined_events.sort(key=lambda x: (x['date'], x['timestamp']), reverse=True)
+    # Unpaid Bills
+    unpaid_bills = Billing.objects.filter(patient=user, is_paid=False)
+    bills_paginator = Paginator(unpaid_bills, 8)
+    bills_page_number = request.GET.get('page_bills')
+    bills_page = bills_paginator.get_page(bills_page_number)
 
-    def paginate_combined_events(event_list, per_page=10):
-        paginator = Paginator(event_list, per_page)
-        page_number = request.GET.get('page_medical_records')
-        return paginator.get_page(page_number)
-
-    medical_records_page = paginate_combined_events(combined_events)
-
-    unpaid_bills = Billing.objects.filter(
-        patient=user,
-        is_paid=False
-    )
-
-
-    def paginate(qs, per_page=10):
-        paginator = Paginator(qs, per_page)
-        page_key = f'page_{qs.model.__name__.lower()}'
-        page_number = request.GET.get(page_key)
-        return paginator.get_page(page_number)
-
-    bills_page = paginate(unpaid_bills)
-
-    medical_records_count = len(combined_events)
-    active_prescriptions_count = prescriptions.count()
-    unpaid_bills_count = unpaid_bills.count()
-
-    recent_activity = []
+    # Summary counts
+    medical_records_count = medical_records_paginator.count
+    active_prescriptions_count = prescriptions.count() if 'prescriptions' in locals() else 0
+    unpaid_bills_count = bills_paginator.count
 
     context = {
         'upcoming_appointments': upcoming_appointments,
@@ -107,7 +111,7 @@ def overview(request):
         'unpaid_bills_count': unpaid_bills_count,
         'medical_records_page': medical_records_page,
         'bills_page': bills_page,
-        'recent_activity': recent_activity
+        'recent_activity': [],
     }
 
     return render(request, 'patients/dashboard.html', context)
