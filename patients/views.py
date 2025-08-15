@@ -16,6 +16,7 @@ from admins.models import DoctorAllocation, Department
 from .models import Billing, Appointment, MedicalVisit, TimeSlot
 from doctors.models import DoctorAvailability, Prescription, DiagnosisNote
 from accounts.models import CustomUser
+from accounts.forms import PatientProfileForm
 from .forms import AppointmentBookingForm
 from django.db.models import Sum, Count
 import json
@@ -26,6 +27,7 @@ from reportlab.pdfgen import canvas
 from io import BytesIO
 import stripe
 from django.conf import settings
+
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -112,9 +114,34 @@ def overview(request):
         'medical_records_page': medical_records_page,
         'bills_page': bills_page,
         'recent_activity': [],
+        'user': request.user,
     }
 
     return render(request, 'patients/dashboard.html', context)
+
+# -----------------------------
+# Profile
+# -----------------------------
+@login_required
+@role_required('patient')
+def edit_profile(request):
+    user = request.user
+    if request.method == 'POST':
+        form = PatientProfileForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            # Check if username is taken by someone else
+            username = form.cleaned_data['username']
+            if CustomUser.objects.exclude(id=user.id).filter(username=username).exists():
+                messages.error(request, 'This username is already taken.')
+            else:
+                form.save()
+                messages.success(request, 'Your profile has been updated successfully!')
+                return redirect('/patients/overview/#profile')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = PatientProfileForm(instance=user)
+    return render(request, 'patients/edit_profile.html', {'form': form})
 
 # -----------------------------
 # Appointments
@@ -377,10 +404,10 @@ def download_visit_pdf(request, appointment_id):
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
 # -----------------------------
 # Billing & Payments
 # -----------------------------
-
 @login_required
 @role_required('patient')
 def pay_bill(request, billing_id):
@@ -548,7 +575,6 @@ def download_prescription_pdf(request, prescription_id):
     response['Content-Disposition'] = f'attachment; filename="prescription_{prescription_id}.pdf"'
     return response
 
-
 # -----------------------------
 # AJAX: Get Doctors by Department
 # -----------------------------
@@ -573,7 +599,6 @@ def get_doctors_by_department(request):
         for doc in doctors
     ]
     return JsonResponse({'doctors': doctor_list})
-
 
 # -----------------------------
 # AJAX: Get Available Time Slots for Doctor on Date
@@ -635,7 +660,6 @@ def get_available_time_slots(request):
 
     return JsonResponse({'available_slots': available_slots})
 
-
 # -----------------------------
 # Booking Form (Main View)
 # -----------------------------
@@ -686,7 +710,6 @@ def book_appointment_form(request):
 
     return render(request, 'patients/book_appointment_form.html', {'form': form})
 
-
 # -----------------------------
 # View Doctor Schedules
 # -----------------------------
@@ -716,7 +739,6 @@ def cancel_appointment(request, appointment_id):
         return redirect('patients:appointments')
     
     return render(request, 'patients/cancel_appointment.html', {'appointment': appointment})
-
 
 # -----------------------------
 # Edit Appointment (Patient)
@@ -773,7 +795,6 @@ def edit_appointment(request, appointment_id):
         })
 
     return render(request, 'patients/edit_appointment.html', {'form': form, 'appointment': appointment})
-
 
 @login_required
 @role_required('patient')

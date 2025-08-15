@@ -11,6 +11,7 @@
         <form action="" method="post">
             {% csrf_token %}
             <button type="submit" class="btn btn-success">Pay with Stripe</button>
+            <a href="{% url 'patients:overview' %}#billing" class="btn btn-outline-secondary">Go Back</a>
         </form>
         </div>
     </div>

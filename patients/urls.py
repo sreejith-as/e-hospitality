@@ -7,6 +7,9 @@ app_name = 'patients'
 urlpatterns = [
     # Main Dashboard
     path('overview/', views.overview, name='overview'),
+
+    # Edit Profile
+    path('edit-profile/', views.edit_profile, name='edit_profile'),
     
     # Redirect old standalone pages to overview with correct tab
     path('medical-records/', RedirectView.as_view(url='/patients/overview/#medical-records', permanent=True)),

@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  .form-control, .form-select {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+    height: 38px;
+  }
+  .form-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #495057;
+  }
+  .card {
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  .card-header {
+    padding: 12px 20px;
+    font-size: 1.1rem;
+  }
+  .card-body {
+    padding: 20px;
+  }
+  .btn {
+    font-size: 0.9rem;
+    padding: 8px 16px;
+  }
+  .profile-pic-preview img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+  .mt-4, .mb-3, .g-4 {
+    margin-top: 1rem !important;
+    margin-bottom: 0.75rem !important;
+    row-gap: 0.75rem;
+  }
+  .container {
+    max-width: 900px;
+  }
+</style>
+
+<div class="container-fluid mt-3">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="card border-0">
+        <!-- Header -->
+        <div class="card-header bg-primary text-white d-flex align-items-center">
+          <i class="bi bi-person-edit me-2"></i>
+          <strong>Edit Profile</strong>
+        </div>
+
+        <!-- Form Body -->
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="row g-3">
+              <!-- Username -->
+              <div class="col-md-6">
+                <label class="form-label">Username</label>
+                {{ form.username }}
+                {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors }}</div>{% endif %}
+              </div>
+
+              <!-- Email -->
+              <div class="col-md-6">
+                <label class="form-label">Email</label>
+                {{ form.email }}
+                {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
+              </div>
+
+              <!-- First Name -->
+              <div class="col-md-6">
+                <label class="form-label">First Name</label>
+                {{ form.first_name }}
+                {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors }}</div>{% endif %}
+              </div>
+
+              <!-- Last Name -->
+              <div class="col-md-6">
+                <label class="form-label">Last Name</label>
+                {{ form.last_name }}
+                {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors }}</div>{% endif %}
+              </div>
+
+              <!-- Phone -->
+              <div class="col-md-6">
+                <label class="form-label">Phone</label>
+                {{ form.phone_number }}
+                {% if form.phone_number.errors %}<div class="text-danger small">{{ form.phone_number.errors }}</div>{% endif %}
+              </div>
+
+              <!-- Gender -->
+              <div class="col-md-6">
+                <label class="form-label">Gender</label>
+                {{ form.gender }}
+                {% if form.gender.errors %}<div class="text-danger small">{{ form.gender.errors }}</div>{% endif %}
+              </div>
+
+              <!-- Date of Birth -->
+              <div class="col-md-6">
+                <label class="form-label">Date of Birth</label>
+                {{ form.date_of_birth }}
+                {% if form.date_of_birth.errors %}<div class="text-danger small">{{ form.date_of_birth.errors }}</div>{% endif %}
+              </div>
+
+              <!-- Address -->
+              <div class="col-md-6">
+                <label class="form-label">Address</label>
+                {{ form.address }}
+                {% if form.address.errors %}<div class="text-danger small">{{ form.address.errors }}</div>{% endif %}
+              </div>
+
+              <!-- Profile Picture -->
+              <div class="col-md-6">
+                <label class="form-label">Profile Picture</label>
+
+                <!-- Hidden File Input -->
+                <input type="file" 
+                      name="profile_picture" 
+                      id="id_profile_picture" 
+                      accept="image/*" 
+                      style="display: none;">
+
+                <!-- Custom Upload Area -->
+                <div id="upload-area" class="border rounded p-3 text-center" 
+                    style="cursor: pointer; background: #f8f9fa; transition: all 0.2s;">
+                  <div id="image-preview-container" class="mb-2">
+                    <!-- Current Image or Placeholder -->
+                    {% if form.profile_picture.value %}
+                      <img src="{{ form.profile_picture.value.url }}" 
+                          alt="Current Profile" 
+                          id="image-preview" 
+                          class="rounded" 
+                          style="width: 80px; height: 80px; object-fit: cover;">
+                    {% else %}
+                      <img src="https://via.placeholder.com/80" 
+                          alt="Upload" 
+                          id="image-preview" 
+                          class="rounded" 
+                          style="width: 80px; height: 80px; object-fit: cover;">
+                    {% endif %}
+                  </div>
+
+                  <small class="text-muted d-block mb-1">Click to upload or drag & drop</small>
+                  <small class="text-secondary">PNG, JPG (Max 5MB)</small>
+                </div>
+
+                <!-- Errors -->
+                {% if form.profile_picture.errors %}
+                  <div class="text-danger small mt-1">{{ form.profile_picture.errors }}</div>
+                {% endif %}
+
+                <!-- Optional: View current image link -->
+                {% if form.profile_picture.value %}
+                  <div class="mt-2">
+                    <a href="{{ form.profile_picture.value.url }}" target="_blank" class="text-primary small">View full image</a>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2 mt-3">
+              <a href="{% url 'patients:overview' %}#profile" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-x-circle"></i> Cancel
+              </a>
+              <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-check-circle"></i> Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const uploadArea = document.getElementById('upload-area');
+  const fileInput = document.getElementById('id_profile_picture');
+  const imagePreview = document.getElementById('image-preview');
+
+  // Click on upload area opens file dialog
+  uploadArea.addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  // Prevent default drag behaviors
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, preventDefaults, false);
+  });
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  // Highlight drop area when dragging over
+  ['dragenter', 'dragover'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, () => {
+      uploadArea.style.backgroundColor = '#e9ecef';
+      uploadArea.style.borderColor = '#3498db';
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    uploadArea.addEventListener(eventName, () => {
+      uploadArea.style.backgroundColor = '#f8f9fa';
+      uploadArea.style.borderColor = '#dee2e6';
+    });
+  });
+
+  // Handle dropped or selected file
+  uploadArea.addEventListener('drop', handleDrop);
+  fileInput.addEventListener('change', () => {
+    updateImagePreview(fileInput.files[0]);
+  });
+
+  function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files.length) {
+      updateImagePreview(files[0]);
+    }
+  }
+
+  function updateImagePreview(file) {
+    if (!file) return;
+    if (!file.type.match('image.*')) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      imagePreview.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+</script>
+{% endblock %}

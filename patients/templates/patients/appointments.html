@@ -6,7 +6,7 @@
     <h2>Appointment History</h2>
     <div>
       <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book New Appointment</a>
-      <a href="#" onclick="history.back()" class="btn btn-secondary">Go Back</a>
+      <a href="{% url 'patients:overview' %}#appointments" class="btn btn-outline-secondary">Go To Dashboard</a>
     </div>
   </div>
 
@@ -48,7 +48,7 @@
                 <td>
                   {% if appointment.status == 'booked' %}
                       <a href="{% url 'patients:edit_appointment' appointment.id %}" class="btn btn-sm btn-primary">Edit</a>
-                      <a href="{% url 'patients:cancel_appointment' appointment.id %}" class="btn btn-sm btn-danger">Cancel</a>
+                      <a href="{% url 'patients:cancel_appointment' appointment.id %}" class="btn btn-sm btn-outline-danger">Cancel</a>
                   {% endif %}
                 </td>
               </tr>

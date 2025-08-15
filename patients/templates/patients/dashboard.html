@@ -20,6 +20,9 @@
     <a class="nav-link mb-2 py-2 px-3 rounded" id="education-tab" data-bs-toggle="pill" href="#education" role="tab" aria-controls="education" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
       <i class="bi bi-book-fill me-2"></i> Education
     </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="profile-tab" data-bs-toggle="pill" href="#profile" role="tab" aria-controls="profile" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-person-fill me-2"></i> Profile
+    </a>
   </nav>
 
   <!-- Tab Content -->
@@ -110,7 +113,7 @@
               <td>
                 {% if appointment.status == 'booked' %}
                   <a href="{% url 'patients:edit_appointment' appointment.id %}" class="btn btn-sm btn-primary">Edit</a>
-                  <a href="{% url 'patients:cancel_appointment' appointment.id %}" class="btn btn-sm btn-danger">Cancel</a>
+                  <a href="{% url 'patients:cancel_appointment' appointment.id %}" class="btn btn-sm btn-outline-danger">Cancel</a>
                 {% endif %}
               </td>
             </tr>
@@ -283,6 +286,49 @@
         <div class="col"><div class="card p-3 shadow-sm"><h5>Healthy Eating</h5><p>Learn about balanced diets and nutrition.</p></div></div>
         <div class="col"><div class="card p-3 shadow-sm"><h5>Exercise Tips</h5><p>Guidance on staying active and fit.</p></div></div>
         <div class="col"><div class="card p-3 shadow-sm"><h5>Mental Health</h5><p>Resources for mental well-being.</p></div></div>
+      </div>
+    </div>
+
+    <!-- Profile Tab -->
+    <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+      <h3>Your Profile</h3>
+
+      <div class="d-flex align-items-center mb-4">
+        <img src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}https://via.placeholder.com/100{% endif %}"
+            alt="Profile Picture"
+            class="rounded-circle me-3"
+            width="100" height="100" style="object-fit: cover;">
+        <div>
+          <h4>{{ user.get_full_name }}</h4>
+          <p class="text-muted mb-1">@{{ user.username }}</p>
+          <p class="text-muted mb-0">Patient ID: {{ user.id }}</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6">
+          <h5>Personal Information</h5>
+          <p><strong>Full Name:</strong> {{ user.get_full_name }}</p>
+          <p><strong>Email:</strong> {{ user.email }}</p>
+          <p><strong>Date of Birth:</strong> {{ user.date_of_birth|date:"M d, Y" }}</p>
+          <p><strong>Gender:</strong> 
+            {% if user.gender == 'M' %}Male
+            {% elif user.gender == 'F' %}Female
+            {% elif user.gender == 'O' %}Other
+            {% else %}Not specified{% endif %}
+          </p>
+        </div>
+        <div class="col-md-6">
+          <h5>Contact Information</h5>
+          <p><strong>Phone:</strong> {{ user.phone_number|default:"Not specified" }}</p>
+          <p><strong>Address:</strong> {{ user.address|default:"Not specified" }}</p>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <a href="{% url 'patients:edit_profile' %}" class="btn btn-primary">
+          <i class="bi bi-pencil-square me-2"></i> Edit Profile
+        </a>
       </div>
     </div>
   </div>
