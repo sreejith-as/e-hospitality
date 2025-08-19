@@ -1,67 +1,125 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
-<h2>Doctors</h2>
-<a href="{% url 'admins:add_doctor' %}" class="btn btn-primary mb-3">Add New Doctor</a>
-<a href="{% url 'admins:user_management_landing' %}" class="btn btn-secondary mb-3">Back to Dashboard</a>
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Doctors</h2>
+    <div>
+      <a href="{% url 'admins:add_doctor' %}" class="btn btn-primary">Add New Doctor</a>
+      <a href="{% url 'admins:dashboard' %}#users" class="btn btn-outline-secondary">Back to Dashboard</a>
+    </div>
+  </div>
 
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>Username</th>
-      <th>Email</th>
-      <th>Phone Number</th>
-      <th>Gender</th>
-      <th>Department</th>
-      <th>Working Days</th>
-      <th>Working Hours</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for user in users %}
-    <tr>
-      <td>{{ user.username }}</td>
-      <td>{{ user.email }}</td>
-      <td>{{ user.phone_number }}</td>
-      <td>{{ user.get_gender_display }}</td>
-      <td>
-        {% with allocation=user.doctorallocation_set.first %}
-          {% if allocation %}
-            {{ allocation.department.name }}
-          {% else %}
-            N/A
-          {% endif %}
-        {% endwith %}
-      </td>
-      <td>
-        {% if user.working_days %}
-          {{ user.working_days }}
-        {% else %}
-          N/A
-        {% endif %}
-      </td>
-      <td>
-        {% if user.availability_list %}
-          {% with first_schedule=user.availability_list.0 %}
-            {{ first_schedule.start_time|time:"H:i" }} - {{ first_schedule.end_time|time:"H:i" }}
-            {% if user.availability_list|length > 1 %}
-              *
-            {% endif %}
-          {% endwith %}
-        {% else %}
-          N/A
-        {% endif %}
-      </td>
-      <td>
-        <a href="{% url 'admins:edit_doctor' user.id %}" class="btn btn-sm btn-warning">Edit</a>
-        <a href="{% url 'admins:delete_doctor' user.id %}" class="btn btn-sm btn-danger">Delete</a>
-      </td>
-    </tr>
-    {% empty %}
-    <tr>
-      <td colspan="8">No doctors found.</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+  <!-- Doctors Table -->
+  <div class="card">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">
+        <i class="bi bi-person-badge me-2"></i>All Doctors
+      </h5>
+    </div>
+    <div class="card-body">
+      {% if users %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Gender</th>
+                <th>Department</th>
+                <th>Working Days</th>
+                <th>Working Hours</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user in users %}
+              <tr>
+                <td>
+                  <strong>Dr. {{ user.get_full_name|default:user.username }}</strong>
+                </td>
+                <td>{{ user.email }}</td>
+                <td>{{ user.phone_number|default:"—" }}</td>
+                <td>{{ user.get_gender_display|default:"—" }}</td>
+                <td>
+                  {% with allocation=user.doctorallocation_set.first %}
+                    {% if allocation %}
+                      {{ allocation.department.name }}
+                    {% else %}
+                      <span class="text-muted">Not assigned</span>
+                    {% endif %}
+                  {% endwith %}
+                </td>
+                <td>
+                  {% if user.working_days %}
+                    {{ user.working_days }}
+                  {% else %}
+                    <span class="text-muted">Not set</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if user.working_hours != "Not set" %}
+                    {{ user.working_hours }}
+                  {% else %}
+                    <span class="text-muted">Not set</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="d-flex gap-2">
+                    <a href="{% url 'admins:edit_doctor' user.id %}" class="btn btn-sm btn-primary">Edit</a>
+                    <a href="{% url 'admins:delete_doctor' user.id %}" class="btn btn-sm btn-outline-danger">Delete</a>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="d-flex justify-content-center mt-3">
+          <nav aria-label="Doctors pagination">
+            <ul class="pagination pagination-sm">
+              {% if users.has_previous %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ users.previous_page_number }}">Previous</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">Previous</span>
+                </li>
+              {% endif %}
+
+              <li class="page-item disabled">
+                <span class="page-link">Page {{ users.number }} of {{ users.paginator.num_pages }}</span>
+              </li>
+
+              {% if users.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ users.next_page_number }}">Next</a>
+                </li>
+              {% else %}
+                <li class="page-item disabled">
+                  <span class="page-link">Next</span>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      {% else %}
+        <div class="text-center py-4">
+          <i class="bi bi-person-badge fs-1 text-muted"></i>
+          <p class="text-muted mt-2">No doctors found.</p>
+          <a href="{% url 'admins:add_doctor' %}" class="btn btn-primary">Add Your First Doctor</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block styles %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 {% endblock %}

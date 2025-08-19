@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
-<div class="d-flex" role="tabpanel" style="min-height: 100vh;">
+<div class="d-flex" role="tabpanel" style="min-height: calc(100vh - 200px);">
   <!-- Sidebar Navigation -->
   <nav class="flex-column nav nav-pills me-4 p-3 border rounded" style="min-width: 220px; background-color: #f8f9fa; max-height: calc(100vh - 100px); overflow-y: auto;" role="tablist" aria-orientation="vertical">
     <a class="nav-link mb-2 py-2 px-3 rounded active" id="overview-tab" data-bs-toggle="pill" href="#overview" role="tab" aria-controls="overview" aria-selected="true" style="font-weight: 600; font-size: 1.1rem;">
@@ -77,22 +77,38 @@
             {% endfor %}
           </ul>
         </div>
+        <!-- Today's Financial Overview -->
         <div class="col-md-5 p-3 border rounded bg-white">
-          <h5>Financial Overview</h5>
+          <h5>Today's Financial Overview</h5>
+
           <ul class="list-unstyled">
-            {% for finance in todays_financial_overview %}
-              <li>
-                {% if finance.is_paid %}
-                  <span class="text-success fw-bold">Paid</span>
-                {% else %}
-                  <span class="text-warning fw-bold">Unpaid</span>
-                {% endif %}
-                : {{ finance.count }} (Total: ${{ finance.total_amount }})
-              </li>
-            {% empty %}
-              <li>No billing today.</li>
-            {% endfor %}
+            <li class="mb-2">
+              <strong>Total Bills:</strong>
+              <span class="badge bg-primary ms-2">{{ total_bills_count }}</span>
+            </li>
+            <li class="mb-2">
+              <strong>Unpaid Bills:</strong>
+              <span class="badge bg-warning text-dark ms-2">{{ total_unpaid_bills }}</span>
+            </li>
+            <li class="mb-2">
+              <strong>Money Generated (Paid):</strong>
+              <span class="ms-2">₹{{ total_paid_amount }}</span>
+            </li>
+            <li class="mb-2">
+              <strong>Total Billed Amount:</strong>
+              <span class="ms-2">₹{{ total_billed_amount }}</span>
+            </li>
           </ul>
+
+          <!-- Optional: Show breakdown by paid/unpaid -->
+          {% for finance in todays_financial_overview %}
+            <div class="alert alert-sm mt-2 mb-0 {% if finance.is_paid %}alert-success{% else %}alert-warning{% endif %}" role="alert">
+              <strong>{{ finance.is_paid|yesno:"Paid,Unpaid" }}:</strong>
+              {{ finance.count }} bill(s) — ₹{{ finance.total_amount }}
+            </div>
+          {% empty %}
+            <p class="text-muted">No billing today.</p>
+          {% endfor %}
         </div>
       </div>
     </div>

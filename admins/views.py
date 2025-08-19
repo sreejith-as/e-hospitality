@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 from django.contrib import messages
+from django.urls import reverse
 from accounts.models import CustomUser
 from .models import Department, Room, Resource, DoctorAllocation
 from accounts.utils import role_required
@@ -9,10 +10,12 @@ from django.utils.timezone import now
 from django.db.models import Count, Sum
 from patients.models import Appointment, Billing
 from accounts.forms import PatientRegistrationForm, DoctorRegistrationForm, AdminRegistrationForm
-from doctors.models import Medication, MedicineInventory
+from .forms import PatientEditForm, DoctorEditForm, AdminEditForm
+from doctors.models import Medication, MedicineInventory, DoctorAvailability
 from doctors.forms import MedicationForm
 from django.core.paginator import Paginator
-
+from admins.models import DoctorAllocation
+from django.db import transaction
 
 @login_required
 @role_required('admin')
@@ -20,8 +23,17 @@ def dashboard(request):
     today = now().date()
     total_patients = CustomUser.objects.filter(role='patient').count()
     total_doctors = CustomUser.objects.filter(role='doctor').count()
+    total_admins = CustomUser.objects.filter(role='admin').count()
+
+    total_revenue = Billing.objects.filter(is_paid=True).aggregate(total=Sum('amount'))['total'] or 0
+
     todays_appointments_count = Appointment.objects.filter(schedule__date=today).count()
-    total_revenue = Billing.objects.aggregate(total=Sum('amount'))['total'] or 0
+    todays_total_revenue = Billing.objects.filter(is_paid=True, due_date=today).aggregate(total=Sum('amount'))['total'] or 0
+    todays_bills = Billing.objects.filter(due_date=today)
+    total_bills_count = todays_bills.count()
+    total_unpaid_bills = todays_bills.filter(is_paid=False).count()
+    total_billed_amount = todays_bills.aggregate(total=Sum('amount'))['total'] or 0
+    total_paid_amount = todays_bills.filter(is_paid=True).aggregate(total=Sum('amount'))['total'] or 0
 
     todays_appointment_status = Appointment.objects.filter(schedule__date=today).values('status').annotate(count=Count('id'))
     todays_financial_overview = Billing.objects.filter(due_date=today).values('is_paid').annotate(count=Count('id'), total_amount=Sum('amount'))
@@ -38,11 +50,17 @@ def dashboard(request):
     context = {
         'total_patients': total_patients,
         'total_doctors': total_doctors,
+        'total_admins': total_admins,
         'todays_appointments': todays_appointments_count,
         'total_revenue': total_revenue,
         'todays_appointment_status': todays_appointment_status,
         'todays_financial_overview': todays_financial_overview,
         'todays_appointments_list': todays_appointments_list,
+        'total_bills_count': total_bills_count,
+        'total_unpaid_bills': total_unpaid_bills,
+        'total_billed_amount': total_billed_amount,
+        'total_paid_amount': total_paid_amount,
+        'todays_total_revenue': todays_total_revenue, 
         'departments': departments,
         'billings': billings,
         'medications': medications,
@@ -56,13 +74,11 @@ def all_appointments(request):
     appointments = Appointment.objects.select_related('patient', 'doctor', 'schedule').order_by('-schedule__date', '-schedule__start_time')
     return render(request, 'admins/all_appointments.html', {'appointments': appointments})
 
-
 @login_required
 @role_required('admin')
 def manage_departments(request):
     departments = Department.objects.all()
     return render(request, 'admins/manage_departments.html', {'departments': departments})
-
 
 @login_required
 @role_required('admin')
@@ -78,91 +94,103 @@ def user_management_landing(request):
     }
     return render(request, 'admins/user_management_landing.html', context)
 
-# Role-based user listing views
+# -----------------------------
+# List Users
+# -----------------------------
 @login_required
 @role_required('admin')
 def list_patients(request):
     patients = CustomUser.objects.filter(role='patient').order_by('username')
-    return render(request, 'admins/patients.html', {'users': patients, 'role': 'patient'})
+    paginator = Paginator(patients, 10)  # 10 patients per page
+    page_number = request.GET.get('page')
+    users = paginator.get_page(page_number)
+
+    return render(request, 'admins/patients.html', {'users': users})
 
 @login_required
 @role_required('admin')
 def list_doctors(request):
-    from doctors.models import DoctorAvailability
-    doctors = list(CustomUser.objects.filter(role='doctor').order_by('username'))
-    availabilities = DoctorAvailability.objects.filter(doctor__in=doctors)
-    availability_map = {}
-    for availability in availabilities:
-        availability_map.setdefault(availability.doctor_id, []).append(availability)
-    # Attach availabilities to each doctor object
-    for doctor in doctors:
-        doctor.availability_list = availability_map.get(doctor.id, [])
-        # Create working days string in correct order (Mon to Sun)
-        days_order = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-        days_map = {
-            'mon': 'Mon',
-            'tue': 'Tue',
-            'wed': 'Wed',
-            'thu': 'Thu',
-            'fri': 'Fri',
-            'sat': 'Sat',
-            'sun': 'Sun'
-        }
+    doctors_queryset = CustomUser.objects.filter(role='doctor').order_by('username')
+    doctors_queryset = doctors_queryset.select_related().prefetch_related(
+        'availabilities',
+        'doctorallocation_set__department'
+    )
+
+    paginator = Paginator(doctors_queryset, 10) 
+    page_number = request.GET.get('page')
+    doctors_page = paginator.get_page(page_number)
+    
+    day_names = [
+        ('mon', 'Mon'),
+        ('tue', 'Tue'),
+        ('wed', 'Wed'),
+        ('thu', 'Thu'),
+        ('fri', 'Fri'),
+        ('sat', 'Sat'),
+        ('sun', 'Sun'),
+    ]
+
+    for doctor in doctors_page: 
+        avails = list(doctor.availabilities.all()) 
+
+        # --- Calculate Working Days ---
         working_days = []
-        # Create a set of doctor's working days for quick lookup
-        doctor_days = set(availability.day_of_week for availability in doctor.availability_list)
-        # Add days in correct order
-        for day in days_order:
-            if day in doctor_days and day in days_map:
-                working_days.append(days_map[day])
-        doctor.working_days = ', '.join(working_days)
-    return render(request, 'admins/doctors.html', {'users': doctors, 'role': 'doctor'})
+        for day_short, day_long in day_names:
+            if any(a.day_of_week == day_short for a in avails):
+                working_days.append(day_long)
+        doctor.working_days = ', '.join(working_days) if working_days else 'Not set'
+
+        # --- Calculate Working Hours ---
+        if avails:
+            first_avail = avails[0]
+            if all(a.start_time == first_avail.start_time and a.end_time == first_avail.end_time for a in avails):
+                doctor.working_hours = f"{first_avail.start_time.strftime('%H:%M')} – {first_avail.end_time.strftime('%H:%M')}"
+            else:
+                doctor.working_hours = "Varies by day"
+        else:
+            doctor.working_hours = "Not set"
+
+    return render(request, 'admins/doctors.html', {'users': doctors_page})
 
 @login_required
 @role_required('admin')
 def list_admins(request):
     admins = CustomUser.objects.filter(role='admin').order_by('username')
-    return render(request, 'admins/admins.html', {'users': admins, 'role': 'admin'})
+    paginator = Paginator(admins, 10)
+    page_number = request.GET.get('page')
+    users = paginator.get_page(page_number)
 
+    return render(request, 'admins/admins.html', {'users': users, 'role': 'admin'})
+
+# -----------------------------
+# Add Users
+# -----------------------------
 @login_required
 @role_required('admin')
-def manage_users_by_role(request, role):
-    if role not in ['patient', 'doctor', 'admin']:
-        messages.error(request, 'Invalid user role.')
-        return redirect('admins:user_management_landing')
-
-    users = CustomUser.objects.filter(role=role).order_by('username')
-    return render(request, 'admins/manage_users_by_role.html', {'users': users, 'role': role})
-
-
-# ✅ Single, reusable edit_user
-@login_required
-@role_required('admin')
-def edit_patient(request, user_id):
-    user = get_object_or_404(CustomUser, id=user_id, role='patient')
-
+def add_patient(request):
     if request.method == 'POST':
-        form = PatientRegistrationForm(request.POST, instance=user)
+        form = PatientRegistrationForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Patient updated successfully.')
+            user = form.save(commit=False)
+            user.role = 'patient'
+            user.save()
+            messages.success(request, 'Patient created successfully.')
             return redirect('admins:list_patients')
     else:
-        form = PatientRegistrationForm(instance=user)
-
-    return render(request, 'admins/edit_patient.html', {'form': form, 'user': user})
+        form = PatientRegistrationForm()
+    return render(request, 'admins/add_patient.html', {'form': form})
 
 @login_required
 @role_required('admin')
-def edit_doctor(request, user_id):
-    user = get_object_or_404(CustomUser, id=user_id, role='doctor')
-
+def add_doctor(request):
     if request.method == 'POST':
-        form = DoctorRegistrationForm(request.POST, instance=user)
+        form = DoctorRegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save()
+            user = form.save(commit=False)
+            user.role = 'doctor'
+            user.save()
 
-            # Update doctor-specific schedule and allocation
+            # Save doctor-specific schedule and allocation
             department = form.cleaned_data.get('department')
             work_monday = form.cleaned_data.get('work_monday')
             work_tuesday = form.cleaned_data.get('work_tuesday')
@@ -174,17 +202,10 @@ def edit_doctor(request, user_id):
             start_time = form.cleaned_data.get('start_time')
             end_time = form.cleaned_data.get('end_time')
 
-            from patients.models import TimeSlot
+            from doctors.models import DoctorAvailability
             from admins.models import DoctorAllocation
 
-            # Update or create TimeSlot for the doctor
-            # First, we need to create DoctorAvailability entries for each day the doctor works
-            from doctors.models import DoctorAvailability
-            
-            # Delete existing availability for this doctor
-            DoctorAvailability.objects.filter(doctor=user).delete()
-            
-            # Create new availability entries
+            # Create DoctorAvailability entries for each day the doctor works
             if work_monday:
                 DoctorAvailability.objects.create(doctor=user, day_of_week='mon', start_time=start_time, end_time=end_time)
             if work_tuesday:
@@ -200,19 +221,80 @@ def edit_doctor(request, user_id):
             if work_sunday:
                 DoctorAvailability.objects.create(doctor=user, day_of_week='sun', start_time=start_time, end_time=end_time)
 
-            # Update or create DoctorAllocation
-            allocation, created = DoctorAllocation.objects.update_or_create(
+            DoctorAllocation.objects.create(
                 doctor=user,
-                defaults={
-                    'department': department,
-                    'room': None,
-                }
+                department=department,
+                room=None
             )
 
-            messages.success(request, 'Doctor updated successfully.')
+            messages.success(request, 'Doctor created successfully.')
             return redirect('admins:list_doctors')
     else:
-        form = DoctorRegistrationForm(instance=user)
+        form = DoctorRegistrationForm()
+    return render(request, 'admins/add_doctor.html', {'form': form})
+
+@login_required
+@role_required('admin')
+def add_admin(request):
+    if request.method == 'POST':
+        form = AdminRegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.role = 'admin'
+            user.save()
+            messages.success(request, 'Admin created successfully.')
+            return redirect('admins:list_admins')
+    else:
+        form = AdminRegistrationForm()
+    return render(request, 'admins/add_admin.html', {'form': form})
+
+# -----------------------------
+# Edit Users
+# -----------------------------
+@login_required
+@role_required('admin')
+def edit_patient(request, user_id):
+    user = get_object_or_404(CustomUser, id=user_id, role='patient')
+
+    if request.method == 'POST':
+        form = PatientEditForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Patient updated successfully.')
+            return redirect('admins:list_patients')
+    else:
+        form = PatientEditForm(instance=user)
+
+    return render(request, 'admins/edit_patient.html', {'form': form, 'user': user})
+
+@login_required
+@role_required('admin')
+def edit_doctor(request, user_id):
+    user = get_object_or_404(CustomUser, id=user_id, role='doctor')
+
+    if request.method == 'POST':
+        form = DoctorEditForm(request.POST, instance=user)
+        if form.is_valid():
+            user = form.save()
+            
+            # Handle department allocation
+            department = form.cleaned_data.get('department')
+            if department:
+                DoctorAllocation.objects.update_or_create(
+                    doctor=user,
+                    defaults={'department': department}
+                )
+            
+            messages.success(request, f'Doctor {user.get_full_name} updated successfully.')
+            return redirect('admins:list_doctors')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = DoctorEditForm(instance=user)
+        # Pre-populate department if exists
+        allocation = user.doctorallocation_set.first()
+        if allocation:
+            form.fields['department'].initial = allocation.department
 
     return render(request, 'admins/edit_doctor.html', {'form': form, 'user': user})
 
@@ -222,18 +304,19 @@ def edit_admin(request, user_id):
     user = get_object_or_404(CustomUser, id=user_id, role='admin')
 
     if request.method == 'POST':
-        form = AdminRegistrationForm(request.POST, instance=user)
+        form = AdminEditForm(request.POST, instance=user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Admin updated successfully.')
             return redirect('admins:list_admins')
     else:
-        form = AdminRegistrationForm(instance=user)
+        form = AdminEditForm(instance=user)
 
     return render(request, 'admins/edit_admin.html', {'form': form, 'user': user})
 
-
-# ✅ Single, reusable delete_user
+# -----------------------------
+# Delete Users
+# -----------------------------
 @login_required
 @role_required('admin')
 def delete_patient(request, user_id):
@@ -295,7 +378,9 @@ def create_invoice(request):
     patients = CustomUser.objects.filter(role='patient')
     return render(request, 'admins/create_invoice.html', {'patients': patients})
 
-
+# -----------------------------
+# Department Views
+# -----------------------------
 @login_required
 @role_required('admin')
 def add_department(request):
@@ -305,11 +390,11 @@ def add_department(request):
         if name:
             Department.objects.create(name=name, description=description)
             messages.success(request, 'Department added successfully.')
-            return redirect('admins:manage_departments')
+            url = reverse('admins:dashboard') + '#departments'
+            return redirect(url)
         else:
             messages.error(request, 'Name is required.')
     return render(request, 'admins/add_department.html')
-
 
 @login_required
 @role_required('admin')
@@ -323,11 +408,11 @@ def edit_department(request, department_id):
             department.description = description
             department.save()
             messages.success(request, 'Department updated successfully.')
-            return redirect('admins:manage_departments')  # Always redirect to list
+            url = reverse('admins:dashboard') + '#departments'
+            return redirect(url)
         else:
             messages.error(request, 'Name is required.')
     return render(request, 'admins/edit_department.html', {'department': department})
-
 
 @login_required
 @role_required('admin')
@@ -336,7 +421,8 @@ def delete_department(request, department_id):
     if request.method == 'POST':
         department.delete()
         messages.success(request, 'Department deleted successfully.')
-        return redirect('admins:manage_departments')
+        url = reverse('admins:dashboard') + '#departments'
+        return redirect(url)
     return render(request, 'admins/delete_department.html', {'department': department})
 
 
@@ -439,89 +525,6 @@ def add_doctor_allocation(request):
         'departments': departments,
         'rooms': rooms
     })
-
-@login_required
-@role_required('admin')
-def add_patient(request):
-    if request.method == 'POST':
-        form = PatientRegistrationForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.role = 'patient'
-            user.save()
-            messages.success(request, 'Patient created successfully.')
-            return redirect('admins:list_patients')
-    else:
-        form = PatientRegistrationForm()
-    return render(request, 'admins/add_patient.html', {'form': form})
-
-@login_required
-@role_required('admin')
-def add_doctor(request):
-    if request.method == 'POST':
-        form = DoctorRegistrationForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.role = 'doctor'
-            user.save()
-
-            # Save doctor-specific schedule and allocation
-            department = form.cleaned_data.get('department')
-            work_monday = form.cleaned_data.get('work_monday')
-            work_tuesday = form.cleaned_data.get('work_tuesday')
-            work_wednesday = form.cleaned_data.get('work_wednesday')
-            work_thursday = form.cleaned_data.get('work_thursday')
-            work_friday = form.cleaned_data.get('work_friday')
-            work_saturday = form.cleaned_data.get('work_saturday')
-            work_sunday = form.cleaned_data.get('work_sunday')
-            start_time = form.cleaned_data.get('start_time')
-            end_time = form.cleaned_data.get('end_time')
-
-            from doctors.models import DoctorAvailability
-            from admins.models import DoctorAllocation
-
-            # Create DoctorAvailability entries for each day the doctor works
-            if work_monday:
-                DoctorAvailability.objects.create(doctor=user, day_of_week='mon', start_time=start_time, end_time=end_time)
-            if work_tuesday:
-                DoctorAvailability.objects.create(doctor=user, day_of_week='tue', start_time=start_time, end_time=end_time)
-            if work_wednesday:
-                DoctorAvailability.objects.create(doctor=user, day_of_week='wed', start_time=start_time, end_time=end_time)
-            if work_thursday:
-                DoctorAvailability.objects.create(doctor=user, day_of_week='thu', start_time=start_time, end_time=end_time)
-            if work_friday:
-                DoctorAvailability.objects.create(doctor=user, day_of_week='fri', start_time=start_time, end_time=end_time)
-            if work_saturday:
-                DoctorAvailability.objects.create(doctor=user, day_of_week='sat', start_time=start_time, end_time=end_time)
-            if work_sunday:
-                DoctorAvailability.objects.create(doctor=user, day_of_week='sun', start_time=start_time, end_time=end_time)
-
-            DoctorAllocation.objects.create(
-                doctor=user,
-                department=department,
-                room=None
-            )
-
-            messages.success(request, 'Doctor created successfully.')
-            return redirect('admins:list_doctors')
-    else:
-        form = DoctorRegistrationForm()
-    return render(request, 'admins/add_doctor.html', {'form': form})
-
-@login_required
-@role_required('admin')
-def add_admin(request):
-    if request.method == 'POST':
-        form = AdminRegistrationForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.role = 'admin'
-            user.save()
-            messages.success(request, 'Admin created successfully.')
-            return redirect('admins:list_admins')
-    else:
-        form = AdminRegistrationForm()
-    return render(request, 'admins/add_admin.html', {'form': form})
 
 
 # ✅ Reset password (cleaned)

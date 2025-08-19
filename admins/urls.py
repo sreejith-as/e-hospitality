@@ -34,19 +34,19 @@ urlpatterns = [
     path('admins/', views.list_admins, name='list_admins'),
 
     # Role-based add user pages
-    path('patients/add/', views.add_patient, name='add_patient'),
-    path('doctors/add/', views.add_doctor, name='add_doctor'),
-    path('admins/add/', views.add_admin, name='add_admin'),
+    path('add-patients/', views.add_patient, name='add_patient'),
+    path('add-doctors/', views.add_doctor, name='add_doctor'),
+    path('add-admins/', views.add_admin, name='add_admin'),
 
     # Role-based edit user pages
-    path('patients/edit/<int:user_id>/', views.edit_patient, name='edit_patient'),
-    path('doctors/edit/<int:user_id>/', views.edit_doctor, name='edit_doctor'),
-    path('admins/edit/<int:user_id>/', views.edit_admin, name='edit_admin'),
+    path('edit-patient/<int:user_id>/', views.edit_patient, name='edit_patient'),
+    path('edit-doctor/<int:user_id>/', views.edit_doctor, name='edit_doctor'),
+    path('edit-admin/<int:user_id>/', views.edit_admin, name='edit_admin'),
 
     # Role-based delete user pages
-    path('patients/delete/<int:user_id>/', views.delete_patient, name='delete_patient'),
-    path('doctors/delete/<int:user_id>/', views.delete_doctor, name='delete_doctor'),
-    path('admins/delete/<int:user_id>/', views.delete_admin, name='delete_admin'),
+    path('delete-patient/<int:user_id>/', views.delete_patient, name='delete_patient'),
+    path('delete-doctor/<int:user_id>/', views.delete_doctor, name='delete_doctor'),
+    path('delete-admin/<int:user_id>/', views.delete_admin, name='delete_admin'),
 
     # Role-based reset password pages
     path('patients/reset-password/<int:user_id>/', views.reset_user_password, name='reset_patient_password'),

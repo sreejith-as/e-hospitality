@@ -1,10 +1,78 @@
-{% extends "base.html" %}
+<!-- admins/edit_doctor.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Doctor{% endblock %}
+
+{% block extra_css %}
+<style>
+    .edit-user-form .form-control, .edit-user-form .form-select {
+        margin-bottom: 15px;
+    }
+    .edit-user-form .btn {
+        margin-top: 10px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<h2>Edit Doctor</h2>
-<form method="post" novalidate>
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit" class="btn btn-primary">Save Changes</button>
-  <a href="{% url 'admins:list_doctors' %}" class="btn btn-secondary">Cancel</a>
-</form>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Edit Doctor: {{ user.get_full_name }}</h4>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="edit-user-form">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% for field in form %}
+                            <div class="mb-3">
+                                {{ field.label_tag }}
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <small class="form-text text-muted">{{ field.help_text }}</small>
+                                {% endif %}
+                                {% if field.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in field.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a href="{% url 'admins:list_doctors' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> Update Doctor
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
