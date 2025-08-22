@@ -325,26 +325,26 @@ def add_admin(request):
 @login_required
 @role_required('admin')
 def edit_patient(request, user_id):
-    user = get_object_or_404(CustomUser, id=user_id, role='patient')
+    patient = get_object_or_404(CustomUser, id=user_id, role='patient')
 
     if request.method == 'POST':
-        form = PatientEditForm(request.POST, instance=user)
+        form = PatientEditForm(request.POST, instance=patient)
         if form.is_valid():
             form.save()
             messages.success(request, 'Patient updated successfully.')
             return redirect('admins:list_patients')
     else:
-        form = PatientEditForm(instance=user)
+        form = PatientEditForm(instance=patient)
 
-    return render(request, 'admins/edit_patient.html', {'form': form, 'user': user})
+    return render(request, 'admins/edit_patient.html', {'form': form, 'patient': patient})
 
 @login_required
 @role_required('admin')
 def edit_doctor(request, user_id):
-    user = get_object_or_404(CustomUser, id=user_id, role='doctor')
+    doctor = get_object_or_404(CustomUser, id=user_id, role='doctor')
 
     if request.method == 'POST':
-        form = DoctorEditForm(request.POST, instance=user)
+        form = DoctorEditForm(request.POST, instance=doctor)
         if form.is_valid():
             user = form.save()
             
@@ -361,29 +361,29 @@ def edit_doctor(request, user_id):
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
-        form = DoctorEditForm(instance=user)
+        form = DoctorEditForm(instance=doctor)
         # Pre-populate department if exists
-        allocation = user.doctorallocation_set.first()
+        allocation = doctor.doctorallocation_set.first()
         if allocation:
             form.fields['department'].initial = allocation.department
 
-    return render(request, 'admins/edit_doctor.html', {'form': form, 'user': user})
+    return render(request, 'admins/edit_doctor.html', {'form': form, 'doctor': doctor})
 
 @login_required
 @role_required('admin')
 def edit_admin(request, user_id):
-    user = get_object_or_404(CustomUser, id=user_id, role='admin')
+    admin = get_object_or_404(CustomUser, id=user_id, role='admin')
 
     if request.method == 'POST':
-        form = AdminEditForm(request.POST, instance=user)
+        form = AdminEditForm(request.POST, instance=admin)
         if form.is_valid():
             form.save()
             messages.success(request, 'Admin updated successfully.')
             return redirect('admins:list_admins')
     else:
-        form = AdminEditForm(instance=user)
+        form = AdminEditForm(instance=admin)
 
-    return render(request, 'admins/edit_admin.html', {'form': form, 'user': user})
+    return render(request, 'admins/edit_admin.html', {'form': form, 'admin': admin})
 
 # -----------------------------
 # Delete Users
@@ -847,67 +847,3 @@ def all_bills(request):
     }
 
     return render(request, 'admins/all_bills.html', context)
-
-# -----------------------------
-# Unwanted Views?
-# -----------------------------
-@login_required
-@role_required('admin')
-def manage_departments(request):
-    departments = Department.objects.all()
-    return render(request, 'admins/manage_departments.html', {'departments': departments})
-
-@login_required
-@role_required('admin')
-def manage_doctor_allocations(request):
-    allocations = DoctorAllocation.objects.select_related('doctor', 'department', 'room').all()
-    return render(request, 'admins/manage_doctor_allocations.html', {'allocations': allocations})
-
-@login_required
-@role_required('admin')
-def add_doctor_allocation(request):
-    doctors = CustomUser.objects.filter(role='doctor')
-    departments = Department.objects.all()
-    rooms = Room.objects.all()
-
-    if request.method == 'POST':
-        doctor_id = request.POST.get('doctor')
-        department_id = request.POST.get('department')
-        room_id = request.POST.get('room')
-
-        if not doctor_id or not department_id:
-            messages.error(request, 'Doctor and department are required.')
-        else:
-            doctor = get_object_or_404(CustomUser, id=doctor_id)
-            department = get_object_or_404(Department, id=department_id)
-            room = get_object_or_404(Room, id=room_id) if room_id else None
-
-            DoctorAllocation.objects.create(
-                doctor=doctor,
-                department=department,
-                room=room
-            )
-            messages.success(request, 'Doctor allocation added successfully.')
-            return redirect('admins:manage_doctor_allocations')
-
-    return render(request, 'admins/add_doctor_allocation.html', {
-        'doctors': doctors,
-        'departments': departments,
-        'rooms': rooms
-    })
-
-# ✅ Reset password (cleaned)
-@login_required
-@role_required('admin')
-def reset_user_password(request, user_id):
-    user = get_object_or_404(CustomUser, id=user_id)
-    if request.method == 'POST':
-        new_password = request.POST.get('new_password')
-        if new_password:
-            user.set_password(new_password)
-            user.save()
-            messages.success(request, 'Password reset successfully.')
-            return redirect('admins:manage_users_by_role', role=user.role)
-        else:
-            messages.error(request, 'New password is required.')
-    return render(request, 'admins/reset_user_password.html', {'user': user})

@@ -14,14 +14,9 @@ urlpatterns = [
     path('all-appointments/', views.all_appointments, name='all_appointments'),
 
     # Department Management
-    path('manage-departments/', views.manage_departments, name='manage_departments'),
     path('add-department/', views.add_department, name='add_department'),
     path('edit-department/<int:department_id>/', views.edit_department, name='edit_department'),
     path('delete-department/<int:department_id>/', views.delete_department, name='delete_department'),
-
-    # Doctor Allocation
-    path('doctor-allocations/', views.manage_doctor_allocations, name='manage_doctor_allocations'),
-    path('doctor-allocations/add/', views.add_doctor_allocation, name='add_doctor_allocation'),
 
     # Role-based user listing pages
     path('patients/', views.list_patients, name='list_patients'),
@@ -42,11 +37,6 @@ urlpatterns = [
     path('delete-patient/<int:user_id>/', views.delete_patient, name='delete_patient'),
     path('delete-doctor/<int:user_id>/', views.delete_doctor, name='delete_doctor'),
     path('delete-admin/<int:user_id>/', views.delete_admin, name='delete_admin'),
-
-    # Role-based reset password pages
-    path('patients/reset-password/<int:user_id>/', views.reset_user_password, name='reset_patient_password'),
-    path('doctors/reset-password/<int:user_id>/', views.reset_user_password, name='reset_doctor_password'),
-    path('admins/reset-password/<int:user_id>/', views.reset_user_password, name='reset_admin_password'),
 
     # Financial
     path('create-invoice/', views.select_patient_for_billing, name='select_patient_for_billing'),
