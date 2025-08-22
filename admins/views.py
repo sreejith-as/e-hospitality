@@ -7,9 +7,9 @@ from accounts.models import CustomUser
 from .models import Department, Room, Resource, DoctorAllocation
 from accounts.utils import role_required
 from django.utils.timezone import now
-from django.db.models import Count, Sum
-from patients.models import Appointment, Billing
-from accounts.forms import PatientRegistrationForm, DoctorRegistrationForm, AdminRegistrationForm
+from django.db.models import Count, Sum, Q
+from patients.models import Appointment, Billing, MedicalVisit
+from accounts.forms import PatientRegistrationForm, DoctorRegistrationForm, AdminRegistrationForm, PatientProfileForm
 from .forms import PatientEditForm, DoctorEditForm, AdminEditForm
 from doctors.models import Medication, MedicineInventory, DoctorAvailability
 from doctors.forms import MedicationForm
@@ -17,6 +17,9 @@ from django.core.paginator import Paginator
 from admins.models import DoctorAllocation
 from django.db import transaction
 
+# -----------------------------
+# Dashboard View
+# -----------------------------
 @login_required
 @role_required('admin')
 def dashboard(request):
@@ -47,6 +50,20 @@ def dashboard(request):
     page_number = request.GET.get('page')
     medications = paginator.get_page(page_number)
 
+    # --- Profile Form Handling ---
+    profile_form = None
+    if request.method == 'POST':
+        if 'update_profile' in request.POST:
+            profile_form = PatientProfileForm(request.POST, request.FILES, instance=request.user)
+            if profile_form.is_valid():
+                profile_form.save()
+                messages.success(request, 'Your profile has been updated successfully.')
+                return redirect('admins:dashboard') 
+            else:
+                messages.error(request, 'Please correct the errors below.')
+    if not profile_form: 
+        profile_form = PatientProfileForm(instance=request.user)
+
     context = {
         'total_patients': total_patients,
         'total_doctors': total_doctors,
@@ -64,35 +81,33 @@ def dashboard(request):
         'departments': departments,
         'billings': billings,
         'medications': medications,
+        'profile_form': profile_form,
     }
     return render(request, 'admins/dashboard.html', context)
 
-
-@login_required
+# -----------------------------
+# Profile View
+# -----------------------------
 @role_required('admin')
-def all_appointments(request):
-    appointments = Appointment.objects.select_related('patient', 'doctor', 'schedule').order_by('-schedule__date', '-schedule__start_time')
-    return render(request, 'admins/all_appointments.html', {'appointments': appointments})
+def update_admin_profile(request):
+    """
+    View for the admin to update their profile on a dedicated page.
+    """
+    user = request.user
 
-@login_required
-@role_required('admin')
-def manage_departments(request):
-    departments = Department.objects.all()
-    return render(request, 'admins/manage_departments.html', {'departments': departments})
+    if request.method == 'POST':
+        form = PatientProfileForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Your profile has been updated successfully.')
+            url = reverse('admins:dashboard') + '#profile'
+            return redirect(url)
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = PatientProfileForm(instance=user)
 
-@login_required
-@role_required('admin')
-def user_management_landing(request):
-    total_patients = CustomUser.objects.filter(role='patient').count()
-    total_doctors = CustomUser.objects.filter(role='doctor').count()
-    total_admins = CustomUser.objects.filter(role='admin').count()
-
-    context = {
-        'total_patients': total_patients,
-        'total_doctors': total_doctors,
-        'total_admins': total_admins,
-    }
-    return render(request, 'admins/user_management_landing.html', context)
+    return render(request, 'admins/update_admin_profile.html', {'form': form})
 
 # -----------------------------
 # List Users
@@ -100,26 +115,60 @@ def user_management_landing(request):
 @login_required
 @role_required('admin')
 def list_patients(request):
-    patients = CustomUser.objects.filter(role='patient').order_by('username')
+    # Get the search query from the URL
+    search_query = request.GET.get('search', '')
+
+    # Start with all patients
+    patients = CustomUser.objects.filter(role='patient')
+
+    # Apply search filter if a query is provided
+    if search_query:
+        patients = patients.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    # Order and paginate
+    patients = patients.order_by('username')
     paginator = Paginator(patients, 10)  # 10 patients per page
     page_number = request.GET.get('page')
     users = paginator.get_page(page_number)
 
-    return render(request, 'admins/patients.html', {'users': users})
+    # Pass the search query back to the template so it stays in the input field
+    return render(request, 'admins/patients.html', {
+        'users': users,
+        'search_query': search_query
+    })
 
 @login_required
 @role_required('admin')
 def list_doctors(request):
-    doctors_queryset = CustomUser.objects.filter(role='doctor').order_by('username')
+    # Get the search query from the URL
+    search_query = request.GET.get('search', '')
+
+    # Start with all doctors
+    doctors_queryset = CustomUser.objects.filter(role='doctor')
+
+    # Apply search filter if a query is provided
+    if search_query:
+        doctors_queryset = doctors_queryset.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    # Apply prefetch and order
     doctors_queryset = doctors_queryset.select_related().prefetch_related(
         'availabilities',
         'doctorallocation_set__department'
-    )
+    ).order_by('username')
 
-    paginator = Paginator(doctors_queryset, 10) 
+    # Paginate
+    paginator = Paginator(doctors_queryset, 10)
     page_number = request.GET.get('page')
     doctors_page = paginator.get_page(page_number)
-    
+
     day_names = [
         ('mon', 'Mon'),
         ('tue', 'Tue'),
@@ -150,17 +199,39 @@ def list_doctors(request):
         else:
             doctor.working_hours = "Not set"
 
-    return render(request, 'admins/doctors.html', {'users': doctors_page})
+    return render(request, 'admins/doctors.html', {
+        'users': doctors_page,
+        'search_query': search_query
+    })
 
 @login_required
 @role_required('admin')
 def list_admins(request):
-    admins = CustomUser.objects.filter(role='admin').order_by('username')
+    # Get the search query from the URL
+    search_query = request.GET.get('search', '')
+
+    # Start with all admins
+    admins = CustomUser.objects.filter(role='admin')
+
+    # Apply search filter if a query is provided
+    if search_query:
+        admins = admins.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    # Order and paginate
+    admins = admins.order_by('username')
     paginator = Paginator(admins, 10)
     page_number = request.GET.get('page')
     users = paginator.get_page(page_number)
 
-    return render(request, 'admins/admins.html', {'users': users, 'role': 'admin'})
+    return render(request, 'admins/admins.html', {
+        'users': users,
+        'role': 'admin',
+        'search_query': search_query
+    })
 
 # -----------------------------
 # Add Users
@@ -353,30 +424,70 @@ def delete_admin(request, user_id):
 
     return render(request, 'admins/delete_admin.html', {'user': user})
 
+# -----------------------------
+# Appointment Views
+# -----------------------------
+@role_required('admin')
+def appointment_detail(request, appointment_id):
+    """
+    View to display the detailed information of a single appointment.
+    """
+    # Get the appointment with related patient, doctor, and schedule data
+    appointment = get_object_or_404(
+        Appointment.objects.select_related('patient', 'doctor', 'schedule'),
+        id=appointment_id
+    )
+
+    # Optionally, get the associated medical visit if it exists
+    medical_visit = MedicalVisit.objects.filter(appointment=appointment).first()
+
+    # Context for the template
+    context = {
+        'appointment': appointment,
+        'medical_visit': medical_visit,
+    }
+
+    return render(request, 'admins/appointment_detail.html', context)
 
 @login_required
 @role_required('admin')
-def create_invoice(request):
-    if request.method == 'POST':
-        patient_id = request.POST.get('patient')
-        amount = request.POST.get('amount')
-        due_date = request.POST.get('due_date')
+def all_appointments(request):
+    """
+    View to display all appointments with search and pagination.
+    """
+    # Start with all appointments, ordered by date (newest first)
+    appointments_list = Appointment.objects.select_related(
+        'patient', 
+        'doctor', 
+        'schedule'
+    ).order_by('-schedule__date', '-schedule__start_time')
 
-        if not all([patient_id, amount, due_date]):
-            messages.error(request, 'All fields are required.')
-        else:
-            patient = get_object_or_404(CustomUser, id=patient_id, role='patient')
-            Billing.objects.create(
-                patient=patient,
-                amount=amount,
-                due_date=due_date,
-                is_paid=False
-            )
-            messages.success(request, 'Invoice created successfully.')
-            return redirect('admins:dashboard')
+    # Handle Search
+    search_query = request.GET.get('search', '')
+    if search_query:
+        appointments_list = appointments_list.filter(
+            Q(patient__first_name__icontains=search_query) |
+            Q(patient__last_name__icontains=search_query) |
+            Q(patient__username__icontains=search_query) |
+            Q(doctor__first_name__icontains=search_query) |
+            Q(doctor__last_name__icontains=search_query) |
+            Q(doctor__username__icontains=search_query) |
+            Q(schedule__date__icontains=search_query) |
+            Q(status__icontains=search_query)
+        )
 
-    patients = CustomUser.objects.filter(role='patient')
-    return render(request, 'admins/create_invoice.html', {'patients': patients})
+    # Apply Pagination
+    paginator = Paginator(appointments_list, 10)  # 15 appointments per page
+    page_number = request.GET.get('page')
+    appointments = paginator.get_page(page_number)
+
+    # Pass context to the template
+    context = {
+        'appointments': appointments,
+        'search_query': search_query, # So the search term stays in the input
+    }
+
+    return render(request, 'admins/all_appointments.html', context)
 
 # -----------------------------
 # Department Views
@@ -425,73 +536,332 @@ def delete_department(request, department_id):
         return redirect(url)
     return render(request, 'admins/delete_department.html', {'department': department})
 
-
-@login_required
+# -----------------------------
+# Medication Views
+# -----------------------------
 @role_required('admin')
-def manage_rooms(request):
-    rooms = Room.objects.select_related('department').all()
-    return render(request, 'admins/manage_rooms.html', {'rooms': rooms})
-
-
-@login_required
-@role_required('admin')
-def add_room(request):
-    departments = Department.objects.all()
+def add_medication(request):
+    """
+    View to handle adding a new medication and its initial stock.
+    GET: Renders the dedicated 'add_medication.html' form.
+    POST: Processes the form and redirects back to the dashboard.
+    """
     if request.method == 'POST':
-        department_id = request.POST.get('department')
-        room_number = request.POST.get('room_number')
-        capacity = request.POST.get('capacity')
-
-        if all([department_id, room_number, capacity]):
-            department = get_object_or_404(Department, id=department_id)
-            Room.objects.create(
-                department=department,
-                room_number=room_number,
-                capacity=capacity
-            )
-            messages.success(request, 'Room added successfully.')
-            return redirect('admins:manage_rooms')
-        else:
-            messages.error(request, 'All fields are required.')
-
-    return render(request, 'admins/add_room.html', {'departments': departments})
-
-
-@login_required
-@role_required('admin')
-def manage_resources(request):
-    resources = Resource.objects.all()
-    return render(request, 'admins/manage_resources.html', {'resources': resources})
-
-
-@login_required
-@role_required('admin')
-def add_resource(request):
-    if request.method == 'POST':
+        # Medicine data
         name = request.POST.get('name')
-        description = request.POST.get('description')
+        price = request.POST.get('price')
+        unit = request.POST.get('unit', 'tablet')
+        safety_warnings = request.POST.get('safety_warnings', '')
+
+        # Stock data
         quantity = request.POST.get('quantity')
+        batch_number = request.POST.get('batch_number', '')
+        expiry_date = request.POST.get('expiry_date', None)
 
-        if name and quantity:
-            Resource.objects.create(
-                name=name,
-                description=description,
-                quantity=quantity
+        # Validate
+        try:
+            price = float(price)
+            quantity = int(quantity)
+            if quantity < 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid price or quantity.")
+            # On error, re-render the form with the user's data
+            return render(request, 'admins/add_medication.html', {
+                'name': name,
+                'price': price,
+                'unit': unit,
+                'safety_warnings': safety_warnings,
+                'quantity': quantity,
+                'batch_number': batch_number,
+                'expiry_date': expiry_date,
+            })
+
+        # Create medicine
+        medicine = Medication.objects.create(
+            name=name,
+            price=price,
+            unit=unit,
+            safety_warnings=safety_warnings
+        )
+
+        # If quantity > 0, create inventory entry
+        if quantity > 0:
+            MedicineInventory.objects.create(
+                medicine=medicine,
+                quantity=quantity,
+                batch_number=batch_number,
+                expiry_date=expiry_date
             )
-            messages.success(request, 'Resource added successfully.')
-            return redirect('admins:manage_resources')
+
+        messages.success(request, f"Medicine '{name}' added with {quantity} units in stock.")
+        # Redirect back to the main dashboard
+        url = reverse('admins:dashboard') + '#medications'
+        return redirect(url)
+
+    # If it's a GET request, show the dedicated add page
+    else:
+        return render(request, 'admins/add_medication.html')
+
+@role_required('admin')
+def edit_medication(request, med_id):
+    """
+    View to handle editing an existing medication and optionally adding stock.
+    GET: Renders the dedicated 'edit_medication.html' form.
+    POST: Updates the medicine and adds new stock if provided, then redirects.
+    """
+    medication = get_object_or_404(Medication, id=med_id)
+    
+    if request.method == 'POST':
+        # Medicine data
+        name = request.POST.get('name')
+        price = request.POST.get('price')
+        unit = request.POST.get('unit')
+        safety_warnings = request.POST.get('safety_warnings', '')
+
+        # Stock data for adding more
+        quantity = request.POST.get('quantity')
+        batch_number = request.POST.get('batch_number', '')
+        expiry_date = request.POST.get('expiry_date', None)
+
+        # Validate
+        try:
+            price = float(price)
+            # Quantity can be 0 (meaning don't add stock)
+            quantity = int(quantity) if quantity else 0
+            if quantity < 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid price or quantity.")
+            # On error, re-render the form with current data
+            return render(request, 'admins/edit_medication.html', {
+                'medication': medication
+            })
+
+        # Update the existing medication
+        medication.name = name
+        medication.price = price
+        medication.unit = unit
+        medication.safety_warnings = safety_warnings
+        medication.save()
+
+        # If a positive quantity is provided, add new stock
+        if quantity > 0:
+            MedicineInventory.objects.create(
+                medicine=medication,
+                quantity=quantity,
+                batch_number=batch_number,
+                expiry_date=expiry_date
+            )
+
+        messages.success(request, f"Medication '{medication.name}' updated.")
+        # Redirect back to the main dashboard
+        url = reverse('admins:dashboard') + '#medications'
+        return redirect(url)
+
+    # If it's a GET request, show the dedicated edit page
+    else:
+        return render(request, 'admins/edit_medication.html', {
+            'medication': medication
+        })
+
+@role_required('admin')
+def delete_medication(request, med_id):
+    """
+    View to delete a medication.
+    Shows a confirmation page on GET and performs the deletion on POST.
+    """
+    medication = get_object_or_404(Medication, id=med_id)
+    
+    if request.method == 'POST':
+        # Capture the name before deletion for the success message
+        med_name = medication.name
+        medication.delete()
+        messages.success(request, f"Medicine '{med_name}' deleted successfully.")
+        # Redirect back to the dashboard
+        url = reverse('admins:dashboard') + '#medications'
+        return redirect(url)
+    
+    # If it's a GET request, show the confirmation page
+    return render(request, 'admins/delete_medication.html', {
+        'medication': medication
+    })
+
+# -----------------------------
+# Billing Views
+# -----------------------------
+@role_required('admin')
+def select_patient_for_billing(request):
+    """
+    Step 1: Admin selects a patient.
+    """
+    search_query = request.GET.get('search', '')
+    patients = CustomUser.objects.filter(role='patient')
+    
+    if search_query:
+        patients = patients.filter(
+            Q(username__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+    
+    paginator = Paginator(patients, 10)
+    page_number = request.GET.get('page')
+    patients_page = paginator.get_page(page_number)
+
+    return render(request, 'admins/select_patient.html', {
+        'patients': patients_page,
+        'search_query': search_query
+    })
+
+@role_required('admin')
+def select_appointment_for_billing(request, patient_id):
+    """
+    Step 2: Admin selects a completed appointment for the chosen patient.
+    """
+    patient = get_object_or_404(CustomUser, id=patient_id, role='patient')
+    
+    # Get only COMPLETED appointments for this patient
+    appointments = Appointment.objects.filter(
+        patient=patient, 
+        status='completed'
+    ).select_related('doctor', 'schedule').order_by('-schedule__date')
+
+    return render(request, 'admins/select_appointment.html', {
+        'patient': patient,
+        'appointments': appointments
+    })
+
+@role_required('admin')
+def finalize_invoice(request, appointment_id):
+    """
+    Step 3: Admin creates or updates the invoice for the selected appointment.
+    """
+    # Use select_related to get patient and doctor data in one query
+    appointment = get_object_or_404(
+        Appointment.objects.select_related('patient', 'doctor'), 
+        id=appointment_id
+    )
+
+    # Fetch prescriptions and diagnosis notes for this appointment
+    from doctors.models import Prescription, DiagnosisNote
+    
+    prescriptions = Prescription.objects.filter(
+        appointment=appointment
+    ).select_related('medication')
+    
+    diagnosis_notes = DiagnosisNote.objects.filter(
+        appointment=appointment
+    )
+    
+    # Calculate total prescription cost
+    from django.db.models import Sum
+    prescription_total = prescriptions.aggregate(
+        total=Sum('line_total')
+    )['total'] or 0
+
+    try:
+        existing_bill = Billing.objects.get(appointment=appointment)
+    except Billing.DoesNotExist:
+        existing_bill = None
+
+    if request.method == 'POST':
+        amount = request.POST.get('amount')
+        description = request.POST.get('description')
+        due_date = request.POST.get('due_date')
+
+        if not all([amount, description, due_date]):
+            messages.error(request, 'All fields are required.')
         else:
-            messages.error(request, 'Name and quantity are required.')
+            try:
+                bill, created = Billing.objects.update_or_create(
+                    appointment=appointment,
+                    defaults={
+                        'patient': appointment.patient,
+                        'amount': amount,
+                        'description': description,
+                        'due_date': due_date,
+                        'is_paid': False,
+                        'status': 'pending'
+                    }
+                )
+                
+                if created:
+                    messages.success(request, f'Invoice created successfully for {appointment.patient.get_full_name()}.')
+                else:
+                    messages.success(request, f'Invoice for {appointment.patient.get_full_name()} has been updated.')
+                return redirect('admins:dashboard') 
+                
+            except Exception as e:
+                messages.error(request, f'An error occurred: {str(e)}')
 
-    return render(request, 'admins/add_resource.html')
+    initial_amount = existing_bill.amount if existing_bill else prescription_total
+    initial_description = existing_bill.description if existing_bill else ""
+    initial_due_date = existing_bill.due_date if existing_bill else ""
 
+    suggested_description = f"Consultation fee for {appointment.doctor.get_full_name()} on {appointment.schedule.date}"
+    if prescriptions.exists():
+        med_names = ", ".join([p.medication.name for p in prescriptions])
+        suggested_description += f" + Medications: {med_names}"
+    final_description = initial_description or suggested_description
+
+    return render(request, 'admins/finalize_invoice.html', {
+        'appointment': appointment,
+        'suggested_description': final_description,
+        'prescriptions': prescriptions,
+        'diagnosis_notes': diagnosis_notes,
+        'prescription_total': prescription_total,
+        'existing_bill': existing_bill,
+        'initial_amount': initial_amount,
+        'initial_due_date': initial_due_date,
+    })
+
+@role_required('admin')
+def all_bills(request):
+    """
+    View to display all billing records with search and pagination.
+    """
+    # Start with all bills, ordered by creation date (newest first)
+    bills_list = Billing.objects.select_related('patient').order_by('-created_at')
+
+    # Handle Search
+    search_query = request.GET.get('search', '')
+    if search_query:
+        bills_list = bills_list.filter(
+            Q(patient__first_name__icontains=search_query) |
+            Q(patient__last_name__icontains=search_query) |
+            Q(patient__username__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(status__icontains=search_query)
+        )
+
+    # Apply Pagination
+    paginator = Paginator(bills_list, 10)
+    page_number = request.GET.get('page')
+    bills = paginator.get_page(page_number)
+
+    # Pass context to the template
+    context = {
+        'bills': bills,
+        'search_query': search_query,
+    }
+
+    return render(request, 'admins/all_bills.html', context)
+
+# -----------------------------
+# Unwanted Views?
+# -----------------------------
+@login_required
+@role_required('admin')
+def manage_departments(request):
+    departments = Department.objects.all()
+    return render(request, 'admins/manage_departments.html', {'departments': departments})
 
 @login_required
 @role_required('admin')
 def manage_doctor_allocations(request):
     allocations = DoctorAllocation.objects.select_related('doctor', 'department', 'room').all()
     return render(request, 'admins/manage_doctor_allocations.html', {'allocations': allocations})
-
 
 @login_required
 @role_required('admin')
@@ -526,7 +896,6 @@ def add_doctor_allocation(request):
         'rooms': rooms
     })
 
-
 # ✅ Reset password (cleaned)
 @login_required
 @role_required('admin')
@@ -542,104 +911,3 @@ def reset_user_password(request, user_id):
         else:
             messages.error(request, 'New password is required.')
     return render(request, 'admins/reset_user_password.html', {'user': user})
-
-@role_required('admin')
-def manage_medications(request):
-    medications_list = Medication.objects.all().order_by('name')
-    paginator = Paginator(medications_list, 10)  # 10 per page
-    page_number = request.GET.get('page')
-    medications = paginator.get_page(page_number)
-
-    if request.method == 'POST':
-        form = MedicationForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f"Medication '{form.cleaned_data['name']}' added successfully.")
-            return redirect('admins:manage_medications')
-    else:
-        form = MedicationForm()
-
-    return render(request, 'admins/dashboard.html', {
-        'medications': medications,
-        'form': form,
-    })
-
-@role_required('admin')
-def add_medication_with_stock(request):
-    if request.method == 'POST':
-        # Medicine data
-        name = request.POST.get('name')
-        price = request.POST.get('price')
-        unit = request.POST.get('unit', 'tablet')
-        safety_warnings = request.POST.get('safety_warnings', '')
-
-        # Stock data
-        quantity = request.POST.get('quantity')
-        batch_number = request.POST.get('batch_number', '')
-        expiry_date = request.POST.get('expiry_date', None)
-
-        # Validate
-        try:
-            price = float(price)
-            quantity = int(quantity)
-            if quantity < 0:
-                raise ValueError
-        except (ValueError, TypeError):
-            messages.error(request, "Invalid price or quantity.")
-            return redirect('admins:dashboard')
-
-        # Create medicine
-        medicine = Medication.objects.create(
-            name=name,
-            price=price,
-            unit=unit,
-            safety_warnings=safety_warnings
-        )
-
-        # If quantity > 0, create inventory entry
-        if quantity > 0:
-            MedicineInventory.objects.create(
-                medicine=medicine,
-                quantity=quantity,
-                batch_number=batch_number,
-                expiry_date=expiry_date
-            )
-
-        messages.success(request, f"Medicine '{name}' added with {quantity} units in stock.")
-        return redirect('admins:dashboard')  # Redirect back to #medications tab
-
-    return redirect('admins:dashboard')
-
-@role_required('admin')
-def edit_medication(request, med_id):
-    medication = get_object_or_404(Medication, id=med_id)
-    
-    if request.method == 'POST':
-        form = MedicationForm(request.POST, instance=medication)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f"Medication '{medication.name}' updated.")
-            return redirect('admins:manage_medications')
-    else:
-        form = MedicationForm(instance=medication)
-    
-    return render(request, 'admins/edit_medication.html', {
-        'form': form,
-        'medication': medication
-    })
-
-@role_required('admin')
-def deactivate_medication(request, med_id):
-    medication = get_object_or_404(Medication, id=med_id)
-    medication.is_active = False
-    medication.save()
-    messages.success(request, f"Medication '{medication.name}' deactivated.")
-    return redirect('admins:manage_medications')
-
-@role_required('admin')
-def activate_medication(request, med_id):
-    medication = get_object_or_404(Medication, id=med_id)
-    medication.is_active = True
-    medication.save()
-    messages.success(request, f"Medication '{medication.name}' reactivated.")
-    return redirect('admins:manage_medications')

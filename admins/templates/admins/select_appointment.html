@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Invoice - Select Appointment{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header with Title and Back Button -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Step 2: Select Appointment for {{ patient.get_full_name }}</h2>
+        <a href="{% url 'admins:select_patient_for_billing' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Patient Selection
+        </a>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <!-- Search Input Column (takes 10 columns on md+, 8 on sm) -->
+                <div class="col-12 col-md-10">
+                    <input 
+                        type="text" 
+                        name="search" 
+                        class="form-control" 
+                        placeholder="Search by username, first name, or last name..." 
+                        value="{{ search_query }}">
+                </div>
+                <!-- Buttons Column (takes 2 columns on md+, 12 on sm) -->
+                <div class="col-12 col-md-2">
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% if appointments %}
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Doctor</th>
+                        <th>Status</th>
+                        <th>Symptoms</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for appt in appointments %}
+                    <tr>
+                        <td>{{ appt.schedule.date }}</td>
+                        <td>{{ appt.schedule.start_time|time:"h:i A" }}</td>
+                        <td>Dr. {{ appt.doctor.get_full_name }}</td>
+                        <td><span class="badge bg-success">{{ appt.status|title }}</span></td>
+                        <td>{{ appt.symptoms|truncatechars:50|default:"-" }}</td>
+                        <td>
+                            <a href="{% url 'admins:finalize_invoice' appt.id %}" class="btn btn-sm btn-primary">
+                                Create Invoice
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> No completed appointments found for this patient.
+            <a href="{% url 'admins:select_patient_for_billing' %}" class="btn btn-sm btn-outline-primary ms-2">Select Another Patient</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

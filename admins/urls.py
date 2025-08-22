@@ -5,28 +5,23 @@ app_name = 'admins'
 
 urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
-    path('all-appointments/', views.all_appointments, name='all_appointments'),
+
+    #profile
+    path('profile/update/', views.update_admin_profile, name='update_admin_profile'),
     
+    # Appointment Detail
+    path('appointments/<int:appointment_id>/', views.appointment_detail, name='appointment_detail'),
+    path('all-appointments/', views.all_appointments, name='all_appointments'),
+
     # Department Management
     path('manage-departments/', views.manage_departments, name='manage_departments'),
     path('add-department/', views.add_department, name='add_department'),
     path('edit-department/<int:department_id>/', views.edit_department, name='edit_department'),
     path('delete-department/<int:department_id>/', views.delete_department, name='delete_department'),
 
-    # Room Management
-    path('manage-rooms/', views.manage_rooms, name='manage_rooms'),
-    path('add-room/', views.add_room, name='add_room'),
-
-    # Resource Management
-    path('manage-resources/', views.manage_resources, name='manage_resources'),  # ✅ Added missing URL
-    path('resources/add/', views.add_resource, name='add_resource'),
-
     # Doctor Allocation
     path('doctor-allocations/', views.manage_doctor_allocations, name='manage_doctor_allocations'),
     path('doctor-allocations/add/', views.add_doctor_allocation, name='add_doctor_allocation'),
-
-    # User Management
-    path('users/', views.user_management_landing, name='user_management_landing'),
 
     # Role-based user listing pages
     path('patients/', views.list_patients, name='list_patients'),
@@ -54,12 +49,13 @@ urlpatterns = [
     path('admins/reset-password/<int:user_id>/', views.reset_user_password, name='reset_admin_password'),
 
     # Financial
-    path('create-invoice/', views.create_invoice, name='create_invoice'),
+    path('create-invoice/', views.select_patient_for_billing, name='select_patient_for_billing'),
+    path('create-invoice/<int:patient_id>/select-appointment/', views.select_appointment_for_billing, name='select_appointment_for_billing'),
+    path('create-invoice/<int:appointment_id>/finalize/', views.finalize_invoice, name='finalize_invoice'),
+    path('all-bills/', views.all_bills, name='all_bills'),
 
     # medicine
-    path('add-medication/', views.add_medication_with_stock, name='add_medication_with_stock'),
-    path('medications/', views.manage_medications, name='manage_medications'),
+    path('add-medication/', views.add_medication, name='add_medication'),
     path('medications/edit/<int:med_id>/', views.edit_medication, name='edit_medication'),
-    path('medications/deactivate/<int:med_id>/', views.deactivate_medication, name='deactivate_medication'),
-    path('medications/activate/<int:med_id>/', views.activate_medication, name='activate_medication'),
+    path('medications/delete/<int:med_id>/', views.delete_medication, name='delete_medication'),
 ]

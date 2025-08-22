@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}All Billing Records{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>All Billing Records</h2>
+        <div>
+            <a href="{% url 'admins:select_patient_for_billing' %}" class="btn btn-primary me-2">
+                <i class="bi bi-plus-circle"></i> Create Invoice
+            </a>
+            <a href="{% url 'admins:dashboard' %}#billing" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <!-- Search Input Column (takes 10 columns on md+, 8 on sm) -->
+                <div class="col-12 col-md-10">
+                    <input 
+                        type="text" 
+                        name="search" 
+                        class="form-control" 
+                        placeholder="Search by username, first name, or last name..." 
+                        value="{{ search_query }}">
+                </div>
+                <!-- Buttons Column (takes 2 columns on md+, 12 on sm) -->
+                <div class="col-12 col-md-2">
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bills Table -->
+    {% if bills %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Patient</th>
+                        <th>Amount (₹)</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Due Date</th>
+                        <th>Created On</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bill in bills %}
+                        <tr>
+                            <td>{{ bill.patient.get_full_name }}</td>
+                            <td>{{ bill.amount }}</td>
+                            <td>{{ bill.description|truncatechars:50 }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if bill.is_paid %}bg-success
+                                    {% else %}bg-warning text-dark{% endif %}">
+                                    {{ bill.get_status_display|title }}
+                                </span>
+                            </td>
+                            <td>{{ bill.due_date }}</td>
+                            <td>{{ bill.created_at|date:"M d, Y" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <nav aria-label="Bills pagination">
+            <ul class="pagination justify-content-center">
+                {% if bills.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?search={{ search_query }}&page=1">&laquo; First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?search={{ search_query }}&page={{ bills.previous_page_number }}">Previous</a>
+                    </li>
+                {% endif %}
+
+                <li class="page-item disabled">
+                    <span class="page-link">
+                        Page {{ bills.number }} of {{ bills.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if bills.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?search={{ search_query }}&page={{ bills.next_page_number }}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?search={{ search_query }}&page={{ bills.paginator.num_pages }}">Last &raquo;</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% else %}
+        <div class="alert alert-info text-center">
+            <i class="bi bi-receipt" style="font-size: 2rem;"></i>
+            <p class="mt-2">No billing records found.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block styles %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}

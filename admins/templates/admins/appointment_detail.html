@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Appointment #{{ appointment.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0">Appointment Details</h2>
+                
+                <!-- Button Group on the Right -->
+                <div class="btn-group" role="group">
+                    <a href="{% url 'admins:all_appointments' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left"></i>Appointments List
+                    </a>
+                    <a href="{% url 'admins:dashboard' %}#appointments" class="btn btn-outline-primary">
+                        Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Appointment Summary Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Patient</h5>
+                            <p class="mb-1"><strong>Name:</strong> {{ appointment.patient.get_full_name }}</p>
+                            <p><strong>Email:</strong> {{ appointment.patient.email }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Doctor</h5>
+                            <p class="mb-1"><strong>Name:</strong> Dr. {{ appointment.doctor.get_full_name }}</p>
+                            <p><strong>Department:</strong> 
+                                {% if appointment.doctor.doctorallocation_set.first %}
+                                    {{ appointment.doctor.doctorallocation_set.first.department.name }}
+                                {% else %}
+                                    <em>Not Assigned</em>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Schedule</h5>
+                            <p><strong>Date:</strong> {{ appointment.schedule.date }}</p>
+                            <p><strong>Time:</strong> {{ appointment.schedule.start_time|time:"h:i A" }} - {{ appointment.schedule.end_time|time:"h:i A" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Details</h5>
+                            <p><strong>Status:</strong> 
+                                <span class="badge 
+                                    {% if appointment.status == 'scheduled' %}bg-primary
+                                    {% elif appointment.status == 'completed' %}bg-success
+                                    {% elif appointment.status == 'cancelled' %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ appointment.status|title }}
+                                </span>
+                            </p>
+                            <p><strong>Booked On:</strong> {{ appointment.created_at }}</p>
+                        </div>
+                    </div>
+                    {% if appointment.symptoms %}
+                        <hr>
+                        <h5>Symptoms Reported</h5>
+                        <p>{{ appointment.symptoms|linebreaks }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Medical Visit (If Exists) -->
+            {% if medical_visit %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0">Medical Visit Record</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Diagnosis</h5>
+                                <p>{{ medical_visit.diagnosis }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Doctor</h5>
+                                <p>Dr. {{ medical_visit.doctor.get_full_name }}</p>
+                            </div>
+                        </div>
+                        {% if medical_visit.symptoms %}
+                            <hr>
+                            <h5>Observed Symptoms</h5>
+                            <p>{{ medical_visit.symptoms|linebreaks }}</p>
+                        {% endif %}
+                        {% if medical_visit.medications_prescribed %}
+                            <hr>
+                            <h5>Medications Prescribed</h5>
+                            <p>{{ medical_visit.medications_prescribed|linebreaks }}</p>
+                        {% endif %}
+                        {% if medical_visit.notes %}
+                            <hr>
+                            <h5>Doctor's Notes</h5>
+                            <p>{{ medical_visit.notes|linebreaks }}</p>
+                        {% endif %}
+                        <hr>
+                        <p class="text-muted"><small>Recorded on: {{ medical_visit.created_at }}</small></p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-journal-text"></i> No medical visit record has been created for this appointment yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}

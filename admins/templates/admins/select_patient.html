@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Invoice - Select Patient{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header with Title and Back Button -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Step 1: Select Patient</h2>
+        <div>
+            <a href="{% url 'admins:all_bills' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-plus-circle"></i> View All Bills
+            </a>
+            <a href="{% url 'admins:dashboard' %}#billing" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <!-- Search Bar -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <!-- Search Input Column (takes 10 columns on md+, 8 on sm) -->
+                <div class="col-12 col-md-10">
+                    <input 
+                        type="text" 
+                        name="search" 
+                        class="form-control" 
+                        placeholder="Search by username, first name, or last name..." 
+                        value="{{ search_query }}">
+                </div>
+                <!-- Buttons Column (takes 2 columns on md+, 12 on sm) -->
+                <div class="col-12 col-md-2">
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Patient List -->
+    {% if patients %}
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Username</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for patient in patients %}
+                    <tr>
+                        <td>{{ patient.username }}</td>
+                        <td>{{ patient.get_full_name }}</td>
+                        <td>{{ patient.email }}</td>
+                        <td>{{ patient.phone_number }}</td>
+                        <td>
+                            <a href="{% url 'admins:select_appointment_for_billing' patient.id %}" class="btn btn-sm btn-primary">
+                                Select
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <nav aria-label="Patients pagination">
+            <ul class="pagination justify-content-center">
+                {% if patients.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?search={{ search_query }}&page=1">&laquo; First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?search={{ search_query }}&page={{ patients.previous_page_number }}">Previous</a>
+                    </li>
+                {% endif %}
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ patients.number }} of {{ patients.paginator.num_pages }}</span>
+                </li>
+                {% if patients.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?search={{ search_query }}&page={{ patients.next_page_number }}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?search={{ search_query }}&page={{ patients.paginator.num_pages }}">Last &raquo;</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% else %}
+        <div class="alert alert-info text-center">No patients found.</div>
+    {% endif %}
+</div>
+{% endblock %}

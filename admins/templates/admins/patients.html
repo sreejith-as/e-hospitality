@@ -9,6 +9,31 @@
       <a href="{% url 'admins:dashboard' %}#users" class="btn btn-outline-secondary">Go To Dashboard</a>
     </div>
   </div>
+  
+  <!-- Search Bar -->
+  <div class="card shadow-sm mb-4">
+      <div class="card-body">
+          <form method="get" class="row g-3 align-items-center">
+              <!-- Search Input Column (takes 10 columns on md+, 8 on sm) -->
+              <div class="col-12 col-md-10">
+                  <input 
+                      type="text" 
+                      name="search" 
+                      class="form-control" 
+                      placeholder="Search by username, first name, or last name..." 
+                      value="{{ search_query }}">
+              </div>
+              <!-- Buttons Column (takes 2 columns on md+, 12 on sm) -->
+              <div class="col-12 col-md-2">
+                  <div class="d-grid gap-2">
+                      <button type="submit" class="btn btn-primary">
+                          <i class="bi bi-search"></i> Search
+                      </button>
+                  </div>
+              </div>
+          </form>
+      </div>
+  </div>
 
   <!-- Patients Table -->
   <div class="card">

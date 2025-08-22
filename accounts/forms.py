@@ -5,6 +5,12 @@ from admins.models import Department
 from doctors.models import DoctorAvailability
 from django.utils.translation import gettext_lazy as _
 
+GENDER_CHOICES = [
+    ('M', 'Male'),
+    ('F', 'Female'),
+    ('O', 'Other'),
+]
+
 class PatientRegistrationForm(UserCreationForm):
     first_name = forms.CharField(
         max_length=30,
@@ -252,21 +258,17 @@ class AdminRegistrationForm(UserCreationForm):
                 self.add_error('password2', error)
 
 class PatientProfileForm(forms.ModelForm):
-    GENDER_CHOICES = [
-        ('M', 'Male'),
-        ('F', 'Female'),
-        ('O', 'Other'),
-    ]
     gender = forms.ChoiceField(
         choices=GENDER_CHOICES,
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-    date_of_birth = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        required=False
+
+
+    profile_picture = forms.ImageField(
+        required=False,
+        widget=forms.FileInput(attrs={'class': 'form-control'})
     )
-    profile_picture = forms.ImageField(required=False)
 
     class Meta:
         model = CustomUser
@@ -287,36 +289,15 @@ class PatientProfileForm(forms.ModelForm):
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'date_of_birth': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
-    GENDER_CHOICES = [
-        ('M', 'Male'),
-        ('F', 'Female'),
-        ('O', 'Other'),
-    ]
-
-    gender = forms.ChoiceField(choices=GENDER_CHOICES, required=False, widget=forms.Select(attrs={'class': 'form-control'}))
-    date_of_birth = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}), required=False)
-    profile_picture = forms.ImageField(required=False)
-
-    class Meta:
-        model = CustomUser
-        fields = [
-            'username',
-            'first_name',
-            'last_name',
-            'email',
-            'phone_number',
-            'gender',
-            'date_of_birth',
-            'address',
-            'profile_picture',
-        ]
-        widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-control'}),
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        help_texts = {
+            'username': 'Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.',
+            'phone_number': 'Enter a valid phone number.',
+            'address': 'Your current residential address.',
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['date_of_birth'].widget.attrs.update({'type': 'date'})

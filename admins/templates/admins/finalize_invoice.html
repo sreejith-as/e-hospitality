@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Invoice{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Step 3: Finalize Invoice</h2>
+
+    <!-- Appointment & Medical Visit Details Card -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Service Details</h5>
+            
+            <!-- Appointment Info -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <p><strong>Patient:</strong> {{ appointment.patient.get_full_name }}</p>
+                    <p><strong>Doctor:</strong> Dr. {{ appointment.doctor.get_full_name }}</p>
+                    <p><strong>Date:</strong> {{ appointment.schedule.date }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Status:</strong> 
+                        <span class="badge 
+                            {% if appointment.status == 'completed' %}bg-success
+                            {% else %}bg-warning{% endif %}">
+                            {{ appointment.status|title }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Prescriptions Info -->
+            {% if prescriptions %}
+                <hr>
+                <h6>Prescriptions</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Medicine</th>
+                                <th>Dosage</th>
+                                <th>Quantity</th>
+                                <th>Price (₹)</th>
+                                <th>Total (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in prescriptions %}
+                            <tr>
+                                <td>{{ p.medication.name }}</td>
+                                <td>{{ p.dosage }}</td>
+                                <td>{{ p.quantity }}</td>
+                                <td>{{ p.medication.price }}</td>
+                                <td>{{ p.line_total }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td colspan="4" class="text-end">Prescription Subtotal:</td>
+                                <td>₹{{ prescription_total }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            {% endif %}
+
+            <!-- Diagnosis Notes -->
+            {% if diagnosis_notes %}
+                <hr>
+                <h6>Diagnosis & Notes</h6>
+                <ul class="list-unstyled">
+                    {% for note in diagnosis_notes %}
+                        <li><strong>Diagnosis:</strong> {{ note.diagnosis }}</li>
+                        <li><strong>Notes:</strong> {{ note.notes|default:"-" }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            <!-- No Medical Data -->
+            {% if not prescriptions and not diagnosis_notes %}
+                <div class="alert alert-warning p-2 mt-2">
+                    <i class="bi bi-exclamation-triangle"></i> No prescription or diagnosis records have been created for this appointment yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Invoice Form -->
+    <form method="post">
+        {% csrf_token %}
+        
+        <!-- Amount -->
+        <div class="mb-3">
+            <label for="amount" class="form-label">Amount (₹)</label>
+            <input type="number" step="0.01" class="form-control" id="amount" name="amount" 
+                value="{{ initial_amount|floatformat:2 }}" required>
+            <small class="text-muted">
+                {% if prescription_total > 0 %}
+                    Pre-filled with prescription subtotal (₹{{ prescription_total }}). Add consultation fee.
+                {% else %}
+                    Enter the total amount for consultation, procedures, etc.
+                {% endif %}
+            </small>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3" required>{{ suggested_description }}</textarea>
+            <small class="text-muted">This will be shown on the invoice.</small>
+        </div>
+
+        <!-- Due Date -->
+        <div class="mb-3">
+            <label for="due_date" class="form-label">Due Date</label>
+            <input type="date" class="form-control" id="due_date" name="due_date" 
+                value="{{ initial_due_date|date:'Y-m-d' }}" required>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'admins:select_appointment_for_billing' appointment.patient.id %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-receipt"></i> Create Invoice
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block styles %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}
