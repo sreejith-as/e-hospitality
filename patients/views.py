@@ -33,11 +33,11 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 # -----------------------------
-# Patient Dashboard & Overview
+# Patient Dashboard
 # -----------------------------
 @login_required
 @role_required('patient')
-def overview(request):
+def dashboard(request):
     user = request.user
     today = timezone.now().date()
 
@@ -136,7 +136,7 @@ def edit_profile(request):
             else:
                 form.save()
                 messages.success(request, 'Your profile has been updated successfully!')
-                return redirect('/patients/overview/#profile')
+                return redirect('/patients/dashboard/#profile')
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
@@ -236,13 +236,12 @@ def visit_detail(request, appointment_id):
     # Get related medical history for this visit
     medical_history = MedicalVisit.objects.filter(
         patient=request.user
-    ).order_by('-updated_at')[:5]
+    ).order_by('-created_at')[:5]
     
-    # Get prescriptions for this visit
+    # ✅ Get prescriptions FOR THIS SPECIFIC APPOINTMENT
     prescriptions = Prescription.objects.filter(
-        patient=request.user,
-        doctor=appointment.doctor
-    ).select_related('medication', 'doctor').order_by('-created_at')[:10]
+        appointment=appointment
+    ).select_related('medication', 'doctor').order_by('-created_at')
     
     context = {
         'appointment': appointment,
@@ -250,7 +249,6 @@ def visit_detail(request, appointment_id):
         'prescriptions': prescriptions,
     }
     return render(request, 'patients/visit_detail.html', context)
-
 
 @login_required
 @role_required('patient')
@@ -721,7 +719,7 @@ def view_doctors_schedule(request):
     return render(request, 'patients/doctor_schedule.html', {'schedules': schedules})
 
 # -----------------------------
-# Cancel Appointment (Patient)
+# Cancel Appointment
 # -----------------------------
 @login_required
 @role_required('patient')
@@ -741,7 +739,7 @@ def cancel_appointment(request, appointment_id):
     return render(request, 'patients/cancel_appointment.html', {'appointment': appointment})
 
 # -----------------------------
-# Edit Appointment (Patient)
+# Edit Appointment
 # -----------------------------
 @login_required
 @role_required('patient')
@@ -751,7 +749,7 @@ def edit_appointment(request, appointment_id):
     # Only allow editing of booked appointments
     if appointment.status != 'booked':
         messages.error(request, 'Cannot edit this appointment.')
-        return redirect('/patients/overview/#appointments')
+        return redirect('/patients/dashboard/#appointments')
     
     if request.method == 'POST':
         form = AppointmentBookingForm(request.POST, instance=appointment)

@@ -12,7 +12,7 @@ def user_login(request):
         if user is not None:
             login(request, user)
             if user.role == 'patient':
-                return redirect('patients:overview')
+                return redirect('patients:dashboard')
             elif user.role == 'doctor':
                 return redirect('doctors:dashboard')
             elif user.role == 'admin':

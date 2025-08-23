@@ -6,7 +6,7 @@
     <h2>Appointment History</h2>
     <div>
       <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book New Appointment</a>
-      <a href="{% url 'patients:overview' %}#appointments" class="btn btn-outline-secondary">Go To Dashboard</a>
+      <a href="{% url 'patients:dashboard' %}#appointments" class="btn btn-outline-secondary">Go To Dashboard</a>
     </div>
   </div>
 
@@ -91,7 +91,7 @@
         <div class="text-center py-4">
           <i class="bi bi-calendar-x fs-1 text-muted"></i>
           <p class="text-muted mt-2">No upcoming appointments found.</p>
-          <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book Your First Appointment</a>
+          <a href="{% url 'patients:book_appointment_form' %}" class="btn btn-primary">Book An Appointment</a>
         </div>
       {% endif %}
     </div>
@@ -139,8 +139,8 @@
                   {% endif %}
                 </td>
                 <td>
-                  <a href="#" class="btn btn-sm btn-outline-info" title="View Details">
-                    <i class="bi bi-eye"></i>
+                  <a href="{% url 'patients:visit_detail' appointment.id %}" class="btn btn-sm btn-primary" title="View Details">
+                    View Details
                   </a>
                 </td>
               </tr>

@@ -39,7 +39,7 @@
             {% csrf_token %}
             <p>Are you sure you want to cancel this appointment?</p>
             <button type="submit" class="btn btn-danger">Yes, Cancel Appointment</button>
-            <a href="{% url 'patients:overview' %}#appointments" class="btn btn-secondary">No, Go Back</a>
+            <a href="{% url 'patients:dashboard' %}#appointments" class="btn btn-secondary">No, Go Back</a>
           </form>
         </div>
       </div>

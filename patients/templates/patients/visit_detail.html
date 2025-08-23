@@ -8,8 +8,8 @@
             <a href="{% url 'patients:download_visit_pdf' appointment.id %}" class="btn btn-primary">
                 <i class="bi bi-download me-2"></i>Download PDF
             </a>
-            <a href="{% url 'patients:medical_records' %}" class="btn btn-secondary">
-                <i class="bi bi-arrow-left me-2"></i>Back to Records
+            <a href="{% url 'patients:appointments' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Back to Appointments
             </a>
         </div>
     </div>
@@ -30,7 +30,13 @@
                         </div>
                         <div class="col-md-6">
                             <p><strong>Doctor:</strong> Dr. {{ appointment.doctor.get_full_name }}</p>
-                            <p><strong>Specialization:</strong> {{ appointment.doctor.specialization|default:"General Practice" }}</p>
+                            <p><strong>Specialization:</strong> 
+                                {% if appointment.doctor.doctorallocation_set.first %}
+                                    {{ appointment.doctor.doctorallocation_set.first.department.name }}
+                                {% else %}
+                                    General Practice
+                                {% endif %}
+                            </p>
                             <p><strong>Visit Date:</strong> {{ appointment.schedule.date|date:"M d, Y" }}</p>
                             <p><strong>Visit Time:</strong> {{ appointment.schedule.start_time|time:"h:i A" }}</p>
                         </div>
@@ -86,8 +92,10 @@
                                         <td>{{ prescription.medication.name }}</td>
                                         <td>{{ prescription.dosage }}</td>
                                         <td>{{ prescription.instructions|default:"As directed" }}</td>
-                                        <td>{{ prescription.duration|default:"As needed" }}</td>
+                                        <td>{{ prescription.duration_days }} days</td>
                                     </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-muted">No prescriptions for this visit.</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -122,7 +130,13 @@
                             <i class="bi bi-person-fill text-white fs-3"></i>
                         </div>
                         <h6>Dr. {{ appointment.doctor.get_full_name }}</h6>
-                        <p class="text-muted">{{ appointment.doctor.specialization|default:"General Practice" }}</p>
+                        <p class="text-muted">
+                            {% if appointment.doctor.doctorallocation_set.first %}
+                                {{ appointment.doctor.doctorallocation_set.first.department.name }}
+                            {% else %}
+                                General Practice
+                            {% endif %}
+                        </p>
                     </div>
                     <hr>
                     <p><strong>Contact:</strong> {{ appointment.doctor.email }}</p>
@@ -140,7 +154,15 @@
                     <p><strong>Date:</strong> {{ appointment.schedule.date|date:"M d, Y" }}</p>
                     <p><strong>Time:</strong> {{ appointment.schedule.start_time|time:"h:i A" }} - {{ appointment.schedule.end_time|time:"h:i A" }}</p>
                     <p><strong>Duration:</strong> 30 minutes</p>
-                    <p><strong>Status:</strong> <span class="badge bg-success">Completed</span></p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge 
+                            {% if appointment.status == 'scheduled' %}bg-primary
+                            {% elif appointment.status == 'completed' %}bg-success
+                            {% elif appointment.status == 'cancelled' %}bg-danger
+                            {% else %}bg-secondary{% endif %}">
+                            {{ appointment.status|title }}
+                        </span>
+                    </p>
                 </div>
             </div>
         </div>
@@ -160,4 +182,3 @@
 }
 </style>
 {% endblock %}
-

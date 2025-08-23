@@ -6,15 +6,15 @@ app_name = 'patients'
 
 urlpatterns = [
     # Main Dashboard
-    path('overview/', views.overview, name='overview'),
+    path('dashboard/', views.dashboard, name='dashboard'),
 
     # Edit Profile
     path('edit-profile/', views.edit_profile, name='edit_profile'),
     
-    # Redirect old standalone pages to overview with correct tab
-    path('medical-records/', RedirectView.as_view(url='/patients/overview/#medical-records', permanent=True)),
-    path('prescriptions/', RedirectView.as_view(url='/patients/overview/#prescriptions', permanent=True)),
-    path('billing/', RedirectView.as_view(url='/patients/overview/#billing', permanent=True)),
+    # Redirect old standalone pages to dashboard with correct tab
+    path('medical-records/', RedirectView.as_view(url='/patients/dashboard/#medical-records', permanent=True)),
+    path('prescriptions/', RedirectView.as_view(url='/patients/dashboard/#prescriptions', permanent=True)),
+    path('billing/', RedirectView.as_view(url='/patients/dashboard/#billing', permanent=True)),
 
     # Booking & Appointments
     path('appointments/', views.appointments, name='appointments'),
@@ -47,5 +47,5 @@ urlpatterns = [
     path('payment-success/', views.payment_success, name='payment_success'),
 
     # Dashboard Redirect (Root for patients)
-    path('', RedirectView.as_view(url='/patients/overview/', permanent=True), name='dashboard'),
+    path('', RedirectView.as_view(url='/patients/dashboard/', permanent=True), name='dashboard'),
 ]
