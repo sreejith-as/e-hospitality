@@ -22,6 +22,9 @@
     <a class="nav-link mb-2 py-2 px-3 rounded" id="billing-tab" data-bs-toggle="pill" href="#billing" role="tab" aria-controls="billing" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
       <i class="bi bi-wallet2 me-2"></i> Billing
     </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="health-education-tab" data-bs-toggle="pill" href="#health-education" role="tab" aria-controls="health-education" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-journal-medical me-2"></i> Health Education
+    </a>
     <a class="nav-link mb-2 py-2 px-3 rounded" id="profile-tab" data-bs-toggle="pill" href="#profile" role="tab" aria-controls="profile" aria-selected="false" style="font-weight: 600; font-size: 1.1rem;">
       <i class="bi bi-person-circle me-2"></i> My Profile
     </a>
@@ -424,6 +427,67 @@
         {% endif %}
 
         
+    </div>
+
+    <!-- Health Education Tab -->
+    <div class="tab-pane fade" id="health-education" role="tabpanel" aria-labelledby="health-education-tab">
+        <h3 class="mb-4">Health Education Articles</h3>
+
+        <!-- Add New Article Button -->
+        <div class="mb-4">
+            <a href="{% url 'admins:add_health_article' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add New Article
+            </a>
+        </div>
+
+        <!-- Articles List -->
+        {% if health_articles %}
+            <div class="row g-4">
+                {% for article in health_articles %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 shadow-sm border">
+                            <div class="card-body d-flex flex-column">
+                                <h5 class="card-title">{{ article.title }}</h5>
+                                <p class="card-text text-muted flex-grow-1">{{ article.content|truncatewords:30 }}</p>
+                                <div class="mt-auto">
+                                    <small class="text-muted">
+                                        By {{ article.author.get_full_name }} on {{ article.created_at|date:"M d, Y" }}
+                                    </small>
+                                    <div class="d-flex justify-content-end gap-2 mt-3">
+                                        <a href="{% url 'admins:view_health_article' article.id %}" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-eye"></i> View
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex justify-content-center mt-4">
+                <nav>
+                    <ul class="pagination pagination-sm">
+                        {% if health_articles.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?page=1">&laquo; First</a></li>
+                            <li class="page-item"><a class="page-link" href="?page={{ health_articles.previous_page_number }}">Previous</a></li>
+                        {% endif %}
+                        <li class="page-item disabled"><span class="page-link">Page {{ health_articles.number }} of {{ health_articles.paginator.num_pages }}</span></li>
+                        {% if health_articles.has_next %}
+                            <li class="page-item"><a class="page-link" href="?page={{ health_articles.next_page_number }}">Next</a></li>
+                            <li class="page-item"><a class="page-link" href="?page={{ health_articles.paginator.num_pages }}">Last &raquo;</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center">
+                <i class="bi bi-journal-medical fs-1"></i>
+                <p class="mt-2">No health articles created yet.</p>
+                <a href="{% url 'admins:add_health_article' %}" class="btn btn-primary">Create Your First Article</a>
+            </div>
+        {% endif %}
     </div>
 
     <!-- Profile Tab -->

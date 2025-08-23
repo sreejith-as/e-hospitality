@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
 
+from accounts.models import CustomUser
+
 class Department(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
@@ -38,3 +40,23 @@ class DoctorAllocation(models.Model):
 
     def __str__(self):
         return f"{self.doctor.username} allocated to {self.department.name} {self.room}"
+
+class HealthArticle(models.Model):
+    """
+    A health education article created by an admin.
+    """
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    author = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, related_name='authored_articles')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        # Order by newest first
+        ordering = ['-created_at']
+        verbose_name = 'Health Article'
+        verbose_name_plural = 'Health Articles'
+
+    def __str__(self):
+        return self.title
+

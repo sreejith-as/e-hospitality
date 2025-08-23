@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ article.title }}</h2>
+        <a href="{% url 'patients:dashboard' %}#health-education" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Articles
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <!-- Article Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                <div>
+                    <h6 class="text-muted mb-1">By</h6>
+                    <h5 class="mb-0">{{ article.author.get_full_name }}</h5>
+                </div>
+                <div class="text-end">
+                    <h6 class="text-muted mb-1">Published On</h6>
+                    <h5 class="mb-0">{{ article.created_at|date:"F d, Y" }}</h5>
+                </div>
+            </div>
+
+            <!-- Article Content -->
+            <div class="article-content">
+                {{ article.content|linebreaks }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .article-content {
+        font-size: 1.1rem;
+        line-height: 1.8;
+    }
+    .article-content p {
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}

@@ -11,8 +11,7 @@ from django.contrib.auth.forms import UserCreationForm
 from accounts.utils import role_required
 from django.utils import timezone
 from datetime import date, datetime, time, timedelta
-
-from admins.models import DoctorAllocation, Department
+from admins.models import DoctorAllocation, Department, HealthArticle
 from .models import Billing, Appointment, MedicalVisit, TimeSlot
 from doctors.models import DoctorAvailability, Prescription, DiagnosisNote
 from accounts.models import CustomUser
@@ -106,6 +105,12 @@ def dashboard(request):
     active_prescriptions_count = prescriptions.count() if 'prescriptions' in locals() else 0
     unpaid_bills_count = bills_paginator.count
 
+    health_articles_list = HealthArticle.objects.all()
+    latest_health_articles = health_articles_list[:3]
+    paginator = Paginator(health_articles_list, 6)
+    page_number = request.GET.get('page')
+    health_articles = paginator.get_page(page_number)
+
     context = {
         'upcoming_appointments': upcoming_appointments,
         'medical_records_count': medical_records_count,
@@ -115,6 +120,8 @@ def dashboard(request):
         'bills_page': bills_page,
         'recent_activity': [],
         'user': request.user,
+        'latest_health_articles': latest_health_articles,
+        'health_articles': health_articles,
     }
 
     return render(request, 'patients/dashboard.html', context)
@@ -468,8 +475,13 @@ def payment_success(request):
 # -----------------------------
 @login_required
 @role_required('patient')
-def health_education(request):
-    return render(request, 'patients/health_education.html')
+def view_health_article(request, article_id):
+    """
+    Patient view to read a single health article.
+    """
+    article = get_object_or_404(HealthArticle, id=article_id)
+    
+    return render(request, 'patients/view_health_article.html', {'article': article})
 
 # -----------------------------
 # Prescription PDF Download

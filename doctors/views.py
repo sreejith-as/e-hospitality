@@ -257,7 +257,7 @@ def profile_update(request):
         doctor_allocation = None
 
     if request.method == 'POST':
-        form = DoctorProfileUpdateForm(request.POST)
+        form = DoctorProfileUpdateForm(request.POST, request.FILES)
         availability_form = DoctorAvailabilitySimpleForm(request.POST)
         if form.is_valid() and availability_form.is_valid():
             # Update user info
@@ -266,6 +266,11 @@ def profile_update(request):
             doctor.email = form.cleaned_data['email']
             doctor.phone_number = form.cleaned_data['phone_number']
             doctor.gender = form.cleaned_data['gender']
+            
+            # Update profile picture if provided
+            if form.cleaned_data['profile_picture']:
+                doctor.profile_picture = form.cleaned_data['profile_picture']
+                
             doctor.save()
 
             # Update or create DoctorAllocation

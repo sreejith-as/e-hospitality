@@ -48,4 +48,10 @@ urlpatterns = [
     path('add-medication/', views.add_medication, name='add_medication'),
     path('medications/edit/<int:med_id>/', views.edit_medication, name='edit_medication'),
     path('medications/delete/<int:med_id>/', views.delete_medication, name='delete_medication'),
+
+    # Health Education
+    path('health-article/<int:article_id>/', views.view_health_article, name='view_health_article'),
+    path('add-health-article/', views.add_health_article, name='add_health_article'),
+    path('health-education/edit/<int:article_id>/', views.edit_health_article, name='edit_health_article'),
+    path('health-education/delete/<int:article_id>/', views.delete_health_article, name='delete_health_article'),
 ]

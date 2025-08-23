@@ -27,6 +27,7 @@ def user_login(request):
     return render(request, 'accounts/login.html')
 
 def user_logout(request):
+    messages.get_messages(request)
     logout(request)
     return redirect('accounts:login')
 

@@ -4,6 +4,7 @@ from .models import DoctorAvailability, Prescription
 from admins.models import Department
 from accounts.models import CustomUser
 from .models import Medication
+from django.forms.widgets import TimeInput, CheckboxSelectMultiple
 
 # -----------------------------
 # Form for Doctor Availability (replaces DoctorScheduleForm)
@@ -56,6 +57,7 @@ class DoctorProfileUpdateForm(forms.Form):
         required=True,
         label="Department"
     )
+    profile_picture = forms.ImageField(required=False)
 
     def __init__(self, *args, **kwargs):
         doctor = kwargs.pop('doctor', None)
@@ -73,9 +75,6 @@ class DoctorProfileUpdateForm(forms.Form):
 # -----------------------------
 # New: Doctor Availability Simple Form
 # -----------------------------
-from django.forms.widgets import TimeInput, CheckboxSelectMultiple
-from django import forms
-
 class DoctorAvailabilitySimpleForm(forms.Form):
     DAYS_OF_WEEK = [
         ('mon', 'Monday'),
@@ -101,7 +100,6 @@ class DoctorAvailabilitySimpleForm(forms.Form):
         widget=TimeInput(format='%I:%M %p', attrs={'type': 'time'}),
         label="End Time"
     )
-
 
 # -----------------------------
 # Prescription Form

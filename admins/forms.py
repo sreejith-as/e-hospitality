@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserChangeForm
 from accounts.models import CustomUser
-from admins.models import Department, DoctorAllocation
+from admins.models import Department, DoctorAllocation, HealthArticle
 from doctors.models import DoctorAvailability
 
 class PatientEditForm(forms.ModelForm):
@@ -318,3 +318,23 @@ class AdminEditForm(forms.ModelForm):
     class Meta:
         model = CustomUser
         fields = ['username', 'first_name', 'last_name', 'email', 'phone_number', 'gender', 'date_of_birth']
+
+class HealthArticleForm(forms.ModelForm):
+    """
+    Form for admins to create and edit health education articles.
+    """
+    class Meta:
+        model = HealthArticle
+        fields = ['title', 'content',]
+        widgets = {
+            'title': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter a compelling title...'
+            }),
+            'content': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 12,
+                'placeholder': 'Write your health education article here...'
+            }),
+        }
+

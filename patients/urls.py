@@ -30,7 +30,7 @@ urlpatterns = [
     path('pay-bill/<int:billing_id>/', views.pay_bill, name='pay_bill'),
 
     # Health & Education
-    path('health-education/', views.health_education, name='health_education'),
+    path('health-article/<int:article_id>/', views.view_health_article, name='view_health_article'),
 
     # PDF Downloads
     path('download-medical-history-pdf/', views.download_medical_history_pdf, name='download_medical_history_pdf'),

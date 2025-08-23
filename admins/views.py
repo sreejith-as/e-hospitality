@@ -4,13 +4,13 @@ from django.http import HttpResponseForbidden
 from django.contrib import messages
 from django.urls import reverse
 from accounts.models import CustomUser
-from .models import Department, Room, Resource, DoctorAllocation
+from .models import Department, Room, Resource, DoctorAllocation, HealthArticle
 from accounts.utils import role_required
 from django.utils.timezone import now
 from django.db.models import Count, Sum, Q
 from patients.models import Appointment, Billing, MedicalVisit
 from accounts.forms import PatientRegistrationForm, DoctorRegistrationForm, AdminRegistrationForm, PatientProfileForm
-from .forms import PatientEditForm, DoctorEditForm, AdminEditForm
+from .forms import PatientEditForm, DoctorEditForm, AdminEditForm, HealthArticleForm
 from doctors.models import Medication, MedicineInventory, DoctorAvailability
 from doctors.forms import MedicationForm
 from django.core.paginator import Paginator
@@ -64,6 +64,15 @@ def dashboard(request):
     if not profile_form: 
         profile_form = PatientProfileForm(instance=request.user)
 
+    # --- Health Articles for the Dashboard Tab ---
+    # Get all articles
+    health_articles_list = HealthArticle.objects.all()
+    # Paginate: 9 articles per page (for a 3x3 grid)
+    paginator = Paginator(health_articles_list, 9)
+    page_number = request.GET.get('health_page') # Use a unique parameter to avoid conflict
+    health_articles = paginator.get_page(page_number)
+
+
     context = {
         'total_patients': total_patients,
         'total_doctors': total_doctors,
@@ -82,6 +91,7 @@ def dashboard(request):
         'billings': billings,
         'medications': medications,
         'profile_form': profile_form,
+        'health_articles': health_articles,
     }
     return render(request, 'admins/dashboard.html', context)
 
@@ -847,3 +857,83 @@ def all_bills(request):
     }
 
     return render(request, 'admins/all_bills.html', context)
+
+# -----------------------------
+# Health Education Views
+# -----------------------------
+@login_required
+@role_required('admin')
+def view_health_article(request, article_id):
+    """
+    Admin view to view a single health article.
+    """
+    article = get_object_or_404(HealthArticle, id=article_id)
+    
+    return render(request, 'admins/view_health_article.html', {'article': article})
+
+@login_required
+@role_required('admin')
+def add_health_article(request):
+    """
+    Admin view to add a new health article.
+    """
+    if request.method == 'POST':
+        form = HealthArticleForm(request.POST)
+        if form.is_valid():
+            article = form.save(commit=False)
+            article.author = request.user
+            article.save()
+            messages.success(request, f"Article '{article.title}' created successfully.")
+            # Redirect back to the Health Education tab in the dashboard
+            url = reverse('admins:dashboard') + '#health-education'
+            return redirect(url)
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = HealthArticleForm()
+
+    return render(request, 'admins/add_health_article.html', {'form': form})
+
+@login_required
+@role_required('admin')
+def edit_health_article(request, article_id):
+    """
+    Admin view to edit an existing health article.
+    """
+    article = get_object_or_404(HealthArticle, id=article_id)
+
+    if request.method == 'POST':
+        form = HealthArticleForm(request.POST, instance=article)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Article '{article.title}' updated.")
+            url = reverse('admins:dashboard') + '#health-education'
+            return redirect(url)
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = HealthArticleForm(instance=article)
+
+    return render(request, 'admins/edit_health_article.html', {
+        'form': form,
+        'article': article
+    })
+
+@login_required
+@role_required('admin')
+def delete_health_article(request, article_id):
+    """
+    Admin view to delete a health article.
+    """
+    article = get_object_or_404(HealthArticle, id=article_id)
+
+    if request.method == 'POST':
+        article_title = article.title
+        article.delete()
+        messages.success(request, f"Article '{article_title}' deleted.")
+        url = reverse('admins:dashboard') + '#health-education'
+        return redirect(url)
+
+    return render(request, 'admins/delete_health_article.html', {
+        'article': article
+    })
