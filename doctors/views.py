@@ -49,6 +49,26 @@ def doctor_dashboard(request):
     patient_ids = appointments.values_list('patient_id', flat=True).distinct()
     patients = CustomUser.objects.filter(id__in=patient_ids)
 
+    # Bills
+    today = timezone.now().date()
+    bills_list = Billing.objects.filter(
+        appointment__doctor=doctor,
+        created_at__date=today
+    ).order_by('-created_at')
+
+    # Handle search for bills
+    search_query = request.GET.get('search', '')
+    if search_query:
+        bills_list = bills_list.filter(
+            Q(description__icontains=search_query) |
+            Q(status__icontains=search_query)
+        )
+
+    # Paginate bills
+    paginator = Paginator(bills_list, 10)
+    page_number = request.GET.get('page')
+    todays_bills = paginator.get_page(page_number)
+
     context = {
         'appointments': appointments,
         'todays_appointments': todays_appointments,
@@ -60,6 +80,8 @@ def doctor_dashboard(request):
         'doctor': doctor,
         'doctor_allocation': doctor_allocation,
         'availability': availability,
+        'todays_bills': todays_bills,
+        'search_query': search_query,
     }
     return render(request, 'doctors/doctor_dashboard.html', context)
 
@@ -510,3 +532,78 @@ def search_medicine(request):
         for med in medicines
     ]
     return JsonResponse({'results': results})
+
+# -----------------------------
+# Bill Detail
+# -----------------------------
+@login_required
+@role_required('doctor')
+def bill_detail(request, bill_id):
+    bill = get_object_or_404(Billing, id=bill_id, appointment__doctor=request.user)
+    context = {
+        'bill': bill,
+    }
+    return render(request, 'doctors/bill_detail.html', context)
+
+# -----------------------------
+# All Bills
+# -----------------------------
+@login_required
+@role_required('doctor')
+def all_bills(request):
+    doctor = request.user
+    
+    # Get all bills for this doctor
+    bills_list = Billing.objects.filter(
+        appointment__doctor=doctor
+    ).order_by('-created_at')
+    
+    # Handle search
+    search_query = request.GET.get('search', '')
+    if search_query:
+        bills_list = bills_list.filter(
+            Q(description__icontains=search_query) |
+            Q(status__icontains=search_query) |
+            Q(patient__first_name__icontains=search_query) |
+            Q(patient__last_name__icontains=search_query)
+        )
+    
+    # Paginate bills
+    paginator = Paginator(bills_list, 10)
+    page_number = request.GET.get('page')
+    bills = paginator.get_page(page_number)
+    
+    context = {
+        'bills': bills,
+        'search_query': search_query,
+    }
+    return render(request, 'doctors/all_bills.html', context)
+
+# -----------------------------
+# Bill Edit
+# -----------------------------
+@login_required
+@role_required('doctor')
+def bill_edit(request, bill_id):
+    bill = get_object_or_404(Billing, id=bill_id, appointment__doctor=request.user)
+    
+    if request.method == 'POST':
+        # Handle bill editing logic here
+        amount = request.POST.get('amount')
+        description = request.POST.get('description')
+        status = request.POST.get('status')
+        
+        if amount and description and status:
+            bill.amount = amount
+            bill.description = description
+            bill.status = status
+            bill.save()
+            messages.success(request, 'Bill updated successfully.')
+            return redirect(f"{reverse('doctors:dashboard')}#bills")
+        else:
+            messages.error(request, 'Please fill all required fields.')
+    
+    context = {
+        'bill': bill,
+    }
+    return render(request, 'doctors/bill_edit.html', context)

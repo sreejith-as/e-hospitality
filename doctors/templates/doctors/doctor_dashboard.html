@@ -9,6 +9,9 @@
     <a class="nav-link mb-2 py-2 px-3 rounded" id="patients-tab" data-bs-toggle="pill" href="#patients" role="tab" aria-controls="patients" style="font-weight: 600; font-size: 1.1rem;">
       <i class="bi bi-people-fill me-2"></i> Patients
     </a>
+    <a class="nav-link mb-2 py-2 px-3 rounded" id="bills-tab" data-bs-toggle="pill" href="#bills" role="tab" aria-controls="bills" style="font-weight: 600; font-size: 1.1rem;">
+      <i class="bi bi-file-earmark-text me-2"></i> Bills
+    </a>
     <a class="nav-link mb-2 py-2 px-3 rounded" id="profile-tab" data-bs-toggle="pill" href="#profile" role="tab" aria-controls="profile" style="font-weight: 600; font-size: 1.1rem;">
       <i class="bi bi-person-circle me-2"></i> Profile
     </a>
@@ -121,6 +124,70 @@
       {% endif %}
     </div>
 
+    <!-- Bills Tab -->
+    <div class="tab-pane fade" id="bills" role="tabpanel" aria-labelledby="bills-tab">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="mb-0">Today's Bills</h3>
+            <a href="{% url 'doctors:all_bills' %}" class="btn btn-primary">View All Bills</a>
+        </div>
+        <form method="get" class="d-flex mb-3">
+            <input type="text" name="search" class="form-control me-2" placeholder="Search by description..." value="{{ search_query }}">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
+        </form>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bill in todays_bills %}
+                <tr>
+                    <td>{{ bill.description }}</td>
+                    <td>₹{{ bill.amount }}</td>
+                    <td>{{ bill.get_status_display }}</td>
+                    <td>
+                        <a href="{% url 'doctors:bill_detail' bill.id %}" class="btn btn-info btn-sm">View</a>
+                        <a href="{% url 'doctors:bill_edit' bill.id %}" class="btn btn-warning btn-sm">Edit</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center">No bills found for today.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if todays_bills.has_other_pages %}
+        <nav>
+            <ul class="pagination">
+                {% if todays_bills.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1&search={{ search_query }}#bills">&laquo; First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ todays_bills.previous_page_number }}&search={{ search_query }}#bills">Previous</a>
+                </li>
+                {% endif %}
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ todays_bills.number }} of {{ todays_bills.paginator.num_pages }}</span>
+                </li>
+                {% if todays_bills.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ todays_bills.next_page_number }}&search={{ search_query }}#bills">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ todays_bills.paginator.num_pages }}&search={{ search_query }}#bills">Last &raquo;</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+    
     <!-- Profile Tab -->
     <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
       <h3 class="mb-4">Doctor Profile</h3>
@@ -200,10 +267,20 @@
 <!-- Tab Activation & Form Handling Script -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const hash = window.location.hash || '#appointments';
+  // Get current hash from URL
+  let hash = window.location.hash;
+  
+  // If no hash is present, default to appointments
+  if (!hash || !['#appointments', '#patients', '#bills', '#profile'].includes(hash)) {
+    hash = '#appointments';
+    // Update URL without triggering page reload
+    history.replaceState(null, null, window.location.pathname + window.location.search + hash);
+  }
+  
   const tabMapping = {
     '#appointments': '#appointments-tab',
     '#patients': '#patients-tab',
+    '#bills': '#bills-tab',
     '#profile': '#profile-tab'
   };
 
@@ -239,18 +316,33 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Also ensure all pagination links include #patients
+  // Also ensure all pagination links include the correct hash
   document.querySelectorAll('.pagination a').forEach(link => {
     if (link.href.includes('#')) return; // Already has hash
-    if (link.href.includes('patients')) {
-      link.href = link.href + '#patients';
+    
+    // Determine which tab this pagination belongs to
+    let tabHash = '#patients'; // Default to patients
+    if (link.href.includes('bills')) {
+      tabHash = '#bills';
     }
+    
+    link.href = link.href + tabHash;
   });
 
   // Handle browser back/forward buttons
   window.addEventListener('hashchange', function () {
     hash = window.location.hash;
     activateTab();
+  });
+
+  // Update hash when tabs are clicked
+  document.querySelectorAll('.nav-link[data-bs-toggle="pill"]').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', function (event) {
+      const target = event.target.getAttribute('href');
+      hash = target;
+      // Update URL without triggering page reload
+      history.replaceState(null, null, window.location.pathname + window.location.search + target);
+    });
   });
 });
 </script>

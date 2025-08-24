@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Bill Details</h2>
+        <a href="{% url 'doctors:dashboard' %}#bills" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+    
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="card-title">Bill Information</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Description:</dt>
+                        <dd class="col-sm-8">{{ bill.description }}</dd>
+                        
+                        <dt class="col-sm-4">Amount:</dt>
+                        <dd class="col-sm-8">₹{{ bill.amount }}</dd>
+                        
+                        <dt class="col-sm-4">Status:</dt>
+                        <dd class="col-sm-8">{{ bill.get_status_display }}</dd>
+                        
+                        <dt class="col-sm-4">Created:</dt>
+                        <dd class="col-sm-8">{{ bill.created_at|date:"M d, Y H:i" }}</dd>
+                        
+                        <dt class="col-sm-4">Due Date:</dt>
+                        <dd class="col-sm-8">{{ bill.due_date|date:"M d, Y" }}</dd>
+                        
+                        <dt class="col-sm-4">Paid:</dt>
+                        <dd class="col-sm-8">
+                            {% if bill.is_paid %}
+                                <span class="badge bg-success">Yes</span>
+                            {% else %}
+                                <span class="badge bg-warning">No</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+                
+                <div class="col-md-6">
+                    <h5 class="card-title">Appointment Information</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Patient:</dt>
+                        <dd class="col-sm-8">{{ bill.patient.get_full_name }}</dd>
+                        
+                        <dt class="col-sm-4">Appointment Date:</dt>
+                        <dd class="col-sm-8">{{ bill.appointment.schedule.date|date:"M d, Y" }}</dd>
+                        
+                        <dt class="col-sm-4">Appointment Time:</dt>
+                        <dd class="col-sm-8">{{ bill.appointment.schedule.start_time|time:"H:i" }} - {{ bill.appointment.schedule.end_time|time:"H:i" }}</dd>
+                        
+                        <dt class="col-sm-4">Doctor:</dt>
+                        <dd class="col-sm-8">{{ bill.appointment.doctor.get_full_name }}</dd>
+                    </dl>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <h5 class="card-title">Actions</h5>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'doctors:bill_edit' bill.id %}" class="btn btn-warning">Edit Bill</a>
+                    <a href="{% url 'doctors:all_bills' %}" class="btn btn-secondary">Back to List</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
