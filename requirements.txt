@@ -1,0 +1,10 @@
+Django>=4.2,<5.0
+asgiref>=3.7.2
+sqlparse>=0.4.4
+mysqlclient>=2.2.0
+python-decouple>=3.8
+Pillow>=10.0.0
+requests>=2.31.0
+cryptography>=41.0.3
+pyOpenSSL>=23.2.0
+bcrypt>=4.0.1
