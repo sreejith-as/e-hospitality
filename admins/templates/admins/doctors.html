@@ -94,6 +94,7 @@
                   <div class="d-flex gap-2">
                     <a href="{% url 'admins:edit_doctor' user.id %}" class="btn btn-sm btn-primary">Edit</a>
                     <a href="{% url 'admins:delete_doctor' user.id %}" class="btn btn-sm btn-outline-danger">Delete</a>
+                    <a href="{% url 'accounts:admin_reset_password' user.id %}" class="btn btn-sm btn-warning">Reset Password</a>
                   </div>
                 </td>
               </tr>

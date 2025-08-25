@@ -12,4 +12,5 @@ urlpatterns = [
     path('password-reset-request/', views.password_reset_request, name='password_reset_request'),
     path('password-reset-confirm/<int:user_id>/<str:token>/', views.password_reset_confirm, name='password_reset_confirm'),
     path('change-password/', views.change_password, name='change_password'),
+    path('admin-reset-password/<int:user_id>/', views.admin_reset_password, name='admin_reset_password'),
 ]

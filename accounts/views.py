@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from accounts.forms import PatientRegistrationForm
 from accounts.models import CustomUser
-from accounts.utils import send_verification_email, send_password_reset_email
+from accounts.utils import role_required, send_verification_email, send_password_reset_email
 from django.contrib.auth.forms import PasswordChangeForm
 
 def user_login(request):
@@ -153,3 +153,17 @@ def change_password(request):
         return render(request, 'doctors/change_password.html', {'form': form})
     else:
         return render(request, 'admins/change_password.html', {'form': form})
+
+@login_required
+@role_required('admin')
+def admin_reset_password(request, user_id):
+    """Admin view to reset a user's password by sending a reset email"""
+    selected_user = get_object_or_404(CustomUser, id=user_id)
+    
+    if request.method == 'POST':
+        # Send password reset email
+        send_password_reset_email(selected_user, request)
+        messages.success(request, f'Password reset email has been sent to {selected_user.email}.')
+        return redirect('admins:dashboard')
+    
+    return render(request, 'accounts/admin_reset_password_confirm.html', {'selected_user': selected_user})
