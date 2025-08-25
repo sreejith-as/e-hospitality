@@ -1,5 +1,18 @@
 # Python
 __pycache__/
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
 *.py[cod]
 *.pyo
 *.pyd
@@ -18,6 +31,7 @@ venv/
 ENV/
 env/
 *.env
+.env.local
 
 # VSCode / IDE
 .vscode/
